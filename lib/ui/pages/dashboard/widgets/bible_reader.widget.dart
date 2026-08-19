@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:bible/core/application/dtos/chapter_video.dto.dart';
-import 'package:bible/ui/pages/dashboard/widgets/player_controls.widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -35,18 +34,13 @@ class _BibleReaderState extends State<BibleReader> {
   void initState() {
     super.initState();
     _controller = YoutubePlayerController(
-      params: YoutubePlayerParams(
+      params: const YoutubePlayerParams(
         interfaceLanguage: 'fr',
         playsInline: true,
-        // Là où le clic n'atteint pas la page, les commandes de YouTube ne
-        // seraient qu'un leurre : on les masque et [PlayerControls] prend le
-        // relais depuis Flutter.
-        showControls: !needsFlutterPlayerControls,
         // Le bouton plein écran du lecteur YouTube lui-même. Depuis la v6, le
         // paquet gère la bascule dans un `OverlayPortal` au-dessus de l'app :
-        // aucun `YoutubePlayerScaffold` à interposer. Il suit le même sort que
-        // les autres commandes sur desktop.
-        showFullscreenButton: !needsFlutterPlayerControls,
+        // aucun `YoutubePlayerScaffold` à interposer.
+        showFullscreenButton: true,
         strictRelatedVideos: true,
       ),
     );
@@ -110,10 +104,8 @@ class _BibleReaderState extends State<BibleReader> {
             enableFullScreenOnVerticalDrag: false,
           ),
         ),
-        if (needsFlutterPlayerControls)
-          PlayerControls(controller: _controller),
         if (widget.videos.length > 1) ...[
-          SizedBox(height: needsFlutterPlayerControls ? 4 : 12),
+          const SizedBox(height: 12),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
