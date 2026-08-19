@@ -37,9 +37,10 @@ class _BibleReaderState extends State<BibleReader> {
       params: const YoutubePlayerParams(
         interfaceLanguage: 'fr',
         playsInline: true,
-        // Le plein écran s'appuierait sur `YoutubePlayerScaffold` ; le lecteur
-        // vit ici au milieu d'une liste défilante, on s'en passe.
-        showFullscreenButton: false,
+        // Le bouton plein écran du lecteur YouTube lui-même. Depuis la v6, le
+        // paquet gère la bascule dans un `OverlayPortal` au-dessus de l'app :
+        // aucun `YoutubePlayerScaffold` à interposer.
+        showFullscreenButton: true,
         strictRelatedVideos: true,
       ),
     );
@@ -96,10 +97,11 @@ class _BibleReaderState extends State<BibleReader> {
             gestureRecognizers: const {
               Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
             },
-            // Le plein écran par glissement entrerait en conflit avec ce que
-            // le lecteur capture désormais lui-même.
+            // Sans effet ici : le recognizer ci-dessus revendique le pointeur
+            // avant qu'un détecteur de glissement placé au-dessus de la vue
+            // native ne puisse le voir. Le plein écran passe par le bouton du
+            // lecteur et par la rotation.
             enableFullScreenOnVerticalDrag: false,
-            autoFullScreen: false,
           ),
         ),
         if (widget.videos.length > 1) ...[
