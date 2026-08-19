@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:bible/core/application/dtos/chapter_video.dto.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
@@ -82,9 +84,20 @@ class _BibleReaderState extends State<BibleReader> {
             key: const Key('bibleReaderPlayer'),
             controller: _controller,
             aspectRatio: 16 / 9,
-            // Le lecteur est posé dans une liste défilante : lui laisser
-            // capturer les gestes verticaux empêcherait de faire défiler la
-            // page depuis la vidéo.
+            // Sans quoi le lecteur est inerte. La vue native (AppKitView sur
+            // macOS, UiKitView sur iOS) ne reçoit que les événements des gestes
+            // qu'elle revendique dans l'arène ; la liste défilante au-dessus,
+            // elle, en revendique. Le défaut du paquet est un ensemble vide,
+            // qui — sa propre documentation le dit — annule les recognizers
+            // qu'il installerait autrement.
+            //
+            // Contrepartie assumée : on ne fait plus défiler la page en
+            // glissant sur la vidéo, exactement comme une iframe sur le web.
+            gestureRecognizers: const {
+              Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
+            },
+            // Le plein écran par glissement entrerait en conflit avec ce que
+            // le lecteur capture désormais lui-même.
             enableFullScreenOnVerticalDrag: false,
             autoFullScreen: false,
           ),
