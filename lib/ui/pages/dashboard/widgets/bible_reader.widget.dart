@@ -79,30 +79,31 @@ class _BibleReaderState extends State<BibleReader> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: YoutubePlayer(
-            key: const Key('bibleReaderPlayer'),
-            controller: _controller,
-            aspectRatio: 16 / 9,
-            // Sans quoi le lecteur est inerte. La vue native (AppKitView sur
-            // macOS, UiKitView sur iOS) ne reçoit que les événements des gestes
-            // qu'elle revendique dans l'arène ; la liste défilante au-dessus,
-            // elle, en revendique. Le défaut du paquet est un ensemble vide,
-            // qui — sa propre documentation le dit — annule les recognizers
-            // qu'il installerait autrement.
-            //
-            // Contrepartie assumée : on ne fait plus défiler la page en
-            // glissant sur la vidéo, exactement comme une iframe sur le web.
-            gestureRecognizers: const {
-              Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
-            },
-            // Sans effet ici : le recognizer ci-dessus revendique le pointeur
-            // avant qu'un détecteur de glissement placé au-dessus de la vue
-            // native ne puisse le voir. Le plein écran passe par le bouton du
-            // lecteur et par la rotation.
-            enableFullScreenOnVerticalDrag: false,
-          ),
+        // Pas de `ClipRRect` autour du lecteur : arrondir les angles d'une vue
+        // native impose au moteur d'insérer des vues de masquage entre elle et
+        // la surface Flutter, et le test de survol d'un clic doit alors les
+        // traverser. Des angles droits valent mieux qu'un lecteur inerte.
+        YoutubePlayer(
+          key: const Key('bibleReaderPlayer'),
+          controller: _controller,
+          aspectRatio: 16 / 9,
+          // Sans quoi le lecteur est inerte. La vue native (AppKitView sur
+          // macOS, UiKitView sur iOS) ne reçoit que les événements des gestes
+          // qu'elle revendique dans l'arène ; la liste défilante au-dessus,
+          // elle, en revendique. Le défaut du paquet est un ensemble vide,
+          // qui — sa propre documentation le dit — annule les recognizers
+          // qu'il installerait autrement.
+          //
+          // Contrepartie assumée : on ne fait plus défiler la page en
+          // glissant sur la vidéo, exactement comme une iframe sur le web.
+          gestureRecognizers: const {
+            Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
+          },
+          // Sans effet ici : le recognizer ci-dessus revendique le pointeur
+          // avant qu'un détecteur de glissement placé au-dessus de la vue
+          // native ne puisse le voir. Le plein écran passe par le bouton du
+          // lecteur et par la rotation.
+          enableFullScreenOnVerticalDrag: false,
         ),
         if (widget.videos.length > 1) ...[
           const SizedBox(height: 12),
