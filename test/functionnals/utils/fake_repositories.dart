@@ -1,0 +1,130 @@
+import 'package:bible/core/domain/exceptions/auth.exception.dart';
+import 'package:bible/core/domain/exceptions/profile.exception.dart';
+import 'package:bible/core/domain/exceptions/reading.exception.dart';
+import 'package:bible/core/domain/model/auth_session.dart';
+import 'package:bible/core/domain/model/reading_board.dart';
+import 'package:bible/core/domain/model/user.dart';
+import 'package:bible/core/domain/services/auth.repository.dart';
+import 'package:bible/core/domain/services/profile.repository.dart';
+import 'package:bible/core/domain/services/reading.repository.dart';
+
+import '../../builders/builders.dart';
+
+/// Implémentations de test des ports du domaine.
+///
+/// C'est le bénéfice direct de l'architecture : les écrans se testent en
+/// remplaçant les adaptateurs, sans faux serveur HTTP ni implémentation en
+/// mémoire embarquée dans l'application.
+
+class FakeAuthRepository implements AuthRepository {
+  /// Session renvoyée par [signIn] / [signUp]. Quand elle est `null`, l'appel
+  /// échoue avec [failure].
+  AuthSession? session;
+  AuthException failure;
+
+  int signOutCalls = 0;
+
+  FakeAuthRepository({
+    this.session,
+    this.failure = const AuthException('Identifiants incorrects.'),
+  });
+
+  @override
+  Future<AuthSession> signIn({
+    required String email,
+    required String password,
+  }) async {
+    final result = session;
+    if (result == null) throw failure;
+    return result;
+  }
+
+  @override
+  Future<AuthSession> signUp({
+    required String name,
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    final result = session;
+    if (result == null) throw failure;
+    return result;
+  }
+
+  @override
+  Future<void> signOut() async => signOutCalls++;
+
+  @override
+  Future<User> me() async => (session ?? anAuthSession()).user;
+}
+
+class FakeReadingRepository implements ReadingRepository {
+  /// Tableau renvoyé par [loadBoard]. `null` déclenche [failure].
+  ReadingBoard? board;
+  ReadingException failure;
+
+  final List<String> readEntries = [];
+
+  FakeReadingRepository({
+    this.board,
+    this.failure = const NoActivePlanException(
+      'Aucun plan de lecture ne vous est encore assigné.',
+    ),
+  });
+
+  @override
+  Future<ReadingBoard> loadBoard() async {
+    final result = board;
+    if (result == null) throw failure;
+    return result;
+  }
+
+  @override
+  Future<ReadingBoard> markAsRead(String entryId) async {
+    readEntries.add(entryId);
+    final current = board;
+    if (current == null) throw failure;
+    // Le serveur renvoie le tableau rafraîchi : on retire la lecture marquée.
+    board = ReadingBoard(
+      plan: current.plan,
+      entries: current.entries.where((entry) => entry.id != entryId).toList(),
+    );
+    return board!;
+  }
+}
+
+class FakeProfileRepository implements ProfileRepository {
+  ProfileException? failure;
+
+  User? updatedUser;
+  String? deletedWithPassword;
+
+  FakeProfileRepository({this.failure});
+
+  @override
+  Future<User> updateProfile({
+    required String name,
+    required String email,
+  }) async {
+    final error = failure;
+    if (error != null) throw error;
+    return updatedUser = aUser(name: name, email: email);
+  }
+
+  @override
+  Future<void> updatePassword({
+    required String currentPassword,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    final error = failure;
+    if (error != null) throw error;
+  }
+
+  @override
+  Future<void> deleteAccount({required String password}) async {
+    final error = failure;
+    if (error != null) throw error;
+    deletedWithPassword = password;
+  }
+}
