@@ -16,6 +16,14 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 /// Le bouton actif suit le lecteur et non l'inverse : il est déduit de la vidéo
 /// réellement chargée, de sorte qu'un enchaînement automatique ou un « suivant »
 /// déclenché depuis les commandes YouTube reste reflété par la sélection.
+/// Vrai là où le paquet sait passer le lecteur en plein écran, c'est-à-dire sur
+/// mobile uniquement. Sur desktop, la vidéo reste enfermée dans sa boîte 16:9 :
+/// il n'y a ni navigateur ni fenêtre pour prendre le relais.
+bool get _supportsFullScreen =>
+    !kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS);
+
 class BibleReader extends StatefulWidget {
   final List<ChapterVideoDto> videos;
 
@@ -34,13 +42,15 @@ class _BibleReaderState extends State<BibleReader> {
   void initState() {
     super.initState();
     _controller = YoutubePlayerController(
-      params: const YoutubePlayerParams(
+      params: YoutubePlayerParams(
         interfaceLanguage: 'fr',
         playsInline: true,
-        // Le bouton plein écran du lecteur YouTube lui-même. Depuis la v6, le
-        // paquet gère la bascule dans un `OverlayPortal` au-dessus de l'app :
-        // aucun `YoutubePlayerScaffold` à interposer.
-        showFullscreenButton: true,
+        // Le paquet ne gère la bascule en plein écran que sur mobile, dans un
+        // `OverlayPortal` au-dessus de l'application : le script qui remonte le
+        // clic sur l'icône n'est même injecté que là (cf. `player.html`).
+        // Ailleurs, afficher le bouton ne ferait que promettre ce qu'il ne peut
+        // pas tenir.
+        showFullscreenButton: _supportsFullScreen,
         strictRelatedVideos: true,
       ),
     );
