@@ -1,8 +1,7 @@
-/// Chemins d'API ajoutés à l'origine du serveur configurée.
+/// Chemins d'API, relatifs à l'origine portée par la `baseUrl` de Dio.
 ///
-/// Tout endpoint vit ici et se combine à l'origine via `BackendUrl.join` : le
-/// jour où un chemin change, il n'y a qu'un seul endroit à corriger.
-/// Cf. `api/API.md`.
+/// Tout endpoint vit ici : le jour où un chemin change, il n'y a qu'un seul
+/// endroit à corriger. Cf. `api/API.md`.
 class BackendEndpoints {
   const BackendEndpoints._();
 

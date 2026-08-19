@@ -54,7 +54,7 @@ final class SettingsServiceProvider
   }
 }
 
-String _$settingsServiceHash() => r'3c04bce9f7fbecc0a31e5cf20fc58ca43d49452c';
+String _$settingsServiceHash() => r'a93ff14bcfea198bc6c94a24ed45c050a264bd1c';
 
 /// Préférence de thème courante, relue au démarrage puis maintenue en état.
 ///

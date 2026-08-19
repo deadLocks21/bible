@@ -1,7 +1,6 @@
 import 'package:bible/core/application/services/settings_application.service.dart';
 import 'package:bible/core/domain/model/app_theme_mode.dart';
 import 'package:bible/infrastructure/logger/providers/logger.service_provider.dart';
-import 'package:bible/infrastructure/settings/providers/settings.repository_provider.dart';
 import 'package:bible/infrastructure/theme/providers/theme.repository_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -9,10 +8,7 @@ part 'settings.service_provider.g.dart';
 
 @Riverpod(keepAlive: true)
 SettingsApplicationService settingsService(Ref ref) {
-  return SettingsApplicationService(
-    ref.watch(settingsRepositoryProvider),
-    ref.watch(themeRepositoryProvider),
-  );
+  return SettingsApplicationService(ref.watch(themeRepositoryProvider));
 }
 
 /// Préférence de thème courante, relue au démarrage puis maintenue en état.

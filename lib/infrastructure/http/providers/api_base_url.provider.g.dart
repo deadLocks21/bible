@@ -11,56 +11,38 @@ part of 'api_base_url.provider.dart';
 /// URL du serveur visée par l'application, lue de façon synchrone par
 /// [dioProvider].
 ///
-/// Ordre de résolution, du plus prioritaire au moins prioritaire :
+/// Elle est fixée à la compilation, et à elle seule :
+/// `flutter run --dart-define=API_BASE_URL=http://localhost:8000`. Sans rien,
+/// l'application parle à la production.
 ///
-/// 1. l'URL enregistrée depuis l'écran Réglages, quand l'utilisateur a voulu
-///    viser un autre serveur que celui compilé (recette, instance locale) ;
-/// 2. la constante de compilation `API_BASE_URL`, passée au build :
-///    `flutter run --dart-define=API_BASE_URL=http://localhost:8000` ;
-/// 3. [kProductionApiBaseUrl], pour qu'un build sans aucune configuration
-///    parle tout de même au serveur de production.
-///
-/// [load] est appelé une fois au démarrage, avant le premier écran. Changer
-/// l'URL via [update] émet un nouvel état, ce qui reconstruit [dioProvider] et
-/// les repositories qui l'observent : l'appel suivant part sur le nouveau
-/// serveur.
+/// Elle est normalisée en origine : un `--dart-define` qui traînerait une barre
+/// oblique finale ou un chemin ne produit pas d'URL d'appel bancale.
 
-@ProviderFor(ApiBaseUrl)
+@ProviderFor(apiBaseUrl)
 final apiBaseUrlProvider = ApiBaseUrlProvider._();
 
 /// URL du serveur visée par l'application, lue de façon synchrone par
 /// [dioProvider].
 ///
-/// Ordre de résolution, du plus prioritaire au moins prioritaire :
+/// Elle est fixée à la compilation, et à elle seule :
+/// `flutter run --dart-define=API_BASE_URL=http://localhost:8000`. Sans rien,
+/// l'application parle à la production.
 ///
-/// 1. l'URL enregistrée depuis l'écran Réglages, quand l'utilisateur a voulu
-///    viser un autre serveur que celui compilé (recette, instance locale) ;
-/// 2. la constante de compilation `API_BASE_URL`, passée au build :
-///    `flutter run --dart-define=API_BASE_URL=http://localhost:8000` ;
-/// 3. [kProductionApiBaseUrl], pour qu'un build sans aucune configuration
-///    parle tout de même au serveur de production.
-///
-/// [load] est appelé une fois au démarrage, avant le premier écran. Changer
-/// l'URL via [update] émet un nouvel état, ce qui reconstruit [dioProvider] et
-/// les repositories qui l'observent : l'appel suivant part sur le nouveau
-/// serveur.
-final class ApiBaseUrlProvider extends $NotifierProvider<ApiBaseUrl, String> {
+/// Elle est normalisée en origine : un `--dart-define` qui traînerait une barre
+/// oblique finale ou un chemin ne produit pas d'URL d'appel bancale.
+
+final class ApiBaseUrlProvider
+    extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
   /// URL du serveur visée par l'application, lue de façon synchrone par
   /// [dioProvider].
   ///
-  /// Ordre de résolution, du plus prioritaire au moins prioritaire :
+  /// Elle est fixée à la compilation, et à elle seule :
+  /// `flutter run --dart-define=API_BASE_URL=http://localhost:8000`. Sans rien,
+  /// l'application parle à la production.
   ///
-  /// 1. l'URL enregistrée depuis l'écran Réglages, quand l'utilisateur a voulu
-  ///    viser un autre serveur que celui compilé (recette, instance locale) ;
-  /// 2. la constante de compilation `API_BASE_URL`, passée au build :
-  ///    `flutter run --dart-define=API_BASE_URL=http://localhost:8000` ;
-  /// 3. [kProductionApiBaseUrl], pour qu'un build sans aucune configuration
-  ///    parle tout de même au serveur de production.
-  ///
-  /// [load] est appelé une fois au démarrage, avant le premier écran. Changer
-  /// l'URL via [update] émet un nouvel état, ce qui reconstruit [dioProvider] et
-  /// les repositories qui l'observent : l'appel suivant part sur le nouveau
-  /// serveur.
+  /// Elle est normalisée en origine : un `--dart-define` qui traînerait une barre
+  /// oblique finale ou un chemin ne produit pas d'URL d'appel bancale.
   ApiBaseUrlProvider._()
     : super(
         from: null,
@@ -77,7 +59,13 @@ final class ApiBaseUrlProvider extends $NotifierProvider<ApiBaseUrl, String> {
 
   @$internal
   @override
-  ApiBaseUrl create() => ApiBaseUrl();
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String create(Ref ref) {
+    return apiBaseUrl(ref);
+  }
 
   /// {@macro riverpod.override_with_value}
   Override overrideWithValue(String value) {
@@ -88,39 +76,4 @@ final class ApiBaseUrlProvider extends $NotifierProvider<ApiBaseUrl, String> {
   }
 }
 
-String _$apiBaseUrlHash() => r'64a137fe51457f5c2066a5530f54e5fe0c9a85b0';
-
-/// URL du serveur visée par l'application, lue de façon synchrone par
-/// [dioProvider].
-///
-/// Ordre de résolution, du plus prioritaire au moins prioritaire :
-///
-/// 1. l'URL enregistrée depuis l'écran Réglages, quand l'utilisateur a voulu
-///    viser un autre serveur que celui compilé (recette, instance locale) ;
-/// 2. la constante de compilation `API_BASE_URL`, passée au build :
-///    `flutter run --dart-define=API_BASE_URL=http://localhost:8000` ;
-/// 3. [kProductionApiBaseUrl], pour qu'un build sans aucune configuration
-///    parle tout de même au serveur de production.
-///
-/// [load] est appelé une fois au démarrage, avant le premier écran. Changer
-/// l'URL via [update] émet un nouvel état, ce qui reconstruit [dioProvider] et
-/// les repositories qui l'observent : l'appel suivant part sur le nouveau
-/// serveur.
-
-abstract class _$ApiBaseUrl extends $Notifier<String> {
-  String build();
-  @$mustCallSuper
-  @override
-  WhenComplete runBuild() {
-    final ref = this.ref as $Ref<String, String>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<String, String>,
-              String,
-              Object?,
-              Object?
-            >;
-    return element.handleCreate(ref, build);
-  }
-}
+String _$apiBaseUrlHash() => r'989fed2615ce6b42cd942ea5d3a32c5cb3d517ee';

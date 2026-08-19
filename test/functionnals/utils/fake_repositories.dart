@@ -8,7 +8,6 @@ import 'package:bible/core/domain/model/user.dart';
 import 'package:bible/core/domain/services/auth.repository.dart';
 import 'package:bible/core/domain/services/profile.repository.dart';
 import 'package:bible/core/domain/services/reading.repository.dart';
-import 'package:bible/core/domain/services/settings.repository.dart';
 import 'package:bible/core/domain/services/theme.repository.dart';
 
 import '../../builders/builders.dart';
@@ -130,22 +129,6 @@ class FakeProfileRepository implements ProfileRepository {
     if (error != null) throw error;
     deletedWithPassword = password;
   }
-}
-
-/// Réglages conservés en mémoire, pour vérifier ce que l'écran persiste.
-class FakeSettingsRepository implements SettingsRepository {
-  String? url;
-
-  FakeSettingsRepository({this.url});
-
-  @override
-  Future<String?> getBackendUrl() async => url;
-
-  @override
-  Future<void> setBackendUrl(String value) async => url = value;
-
-  @override
-  Future<void> clearBackendUrl() async => url = null;
 }
 
 class FakeThemeRepository implements ThemeRepository {

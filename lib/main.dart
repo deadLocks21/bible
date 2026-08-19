@@ -1,7 +1,6 @@
 import 'package:bible/core/application/services/logger_application.service.dart';
 import 'package:bible/core/domain/model/app_theme_mode.dart';
 import 'package:bible/infrastructure/auth/providers/session_revocation.provider.dart';
-import 'package:bible/infrastructure/http/providers/api_base_url.provider.dart';
 import 'package:bible/infrastructure/logger/providers/logger.service_provider.dart';
 import 'package:bible/infrastructure/settings/providers/settings.service_provider.dart';
 import 'package:bible/ui/pages/auth/auth_gate.dart';
@@ -11,7 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Le conteneur Riverpod est construit à la main pour pouvoir lire le logger
@@ -20,15 +19,6 @@ Future<void> main() async {
   final logger = container.read(loggerProvider);
 
   _installErrorHandlers(logger);
-
-  // L'URL du serveur est résolue avant le premier écran : sans cela, le premier
-  // appel HTTP partirait sur l'URL du build alors qu'une autre a pu être
-  // enregistrée depuis les réglages. Au pire, on garde celle du build.
-  try {
-    await container.read(apiBaseUrlProvider.notifier).load();
-  } catch (e, stack) {
-    logger.warn('settings.backend_url.load_failed', error: e, stack: stack);
-  }
 
   logger.info('app.started');
 

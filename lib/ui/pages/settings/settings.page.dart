@@ -1,6 +1,4 @@
 import 'package:bible/core/domain/model/app_theme_mode.dart';
-import 'package:bible/core/utils/backend_url.dart';
-import 'package:bible/infrastructure/http/providers/api_base_url.provider.dart';
 import 'package:bible/infrastructure/settings/providers/app_version.provider.dart';
 import 'package:bible/infrastructure/settings/providers/settings.service_provider.dart';
 import 'package:bible/ui/pages/auth/providers/auth_state.provider.dart';
@@ -14,14 +12,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// l'application.
 ///
 /// Il regroupe l'équivalent de `Pages/Profile/Edit.tsx` côté web et les
-/// réglages propres au mobile (thème, serveur visé, version installée) — le web
-/// n'a besoin ni de l'un ni de l'autre, l'application y étant servie par le
-/// serveur lui-même et suivant le thème du navigateur.
+/// réglages propres au mobile (thème, version installée) — le web n'a besoin
+/// ni de l'un ni de l'autre, l'application y suivant le thème du navigateur.
 ///
-/// Il est atteignable **avant** la connexion, depuis l'écran de connexion :
-/// c'est là que se change l'URL du serveur quand le binaire doit viser autre
-/// chose que le serveur compilé (recette, instance locale). Les sections liées
-/// au compte n'apparaissent donc que lorsqu'une session existe.
+/// Il est atteignable **avant** la connexion, depuis l'écran de connexion, d'où
+/// l'apparence se règle sans compte. Les sections liées au compte
+/// n'apparaissent donc que lorsqu'une session existe.
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
@@ -46,6 +42,7 @@ class SettingsPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _Section(title: 'Apparence', child: const _ThemeChoice()),
           if (user != null) ...[
             _Section(
               title: 'Informations du profil',
@@ -55,15 +52,12 @@ class SettingsPage extends ConsumerWidget {
               title: 'Modifier le mot de passe',
               child: const UpdatePasswordForm(),
             ),
-          ],
-          _Section(title: 'Apparence', child: const _ThemeChoice()),
-          _Section(title: 'Serveur', child: const _ServerChoice()),
-          _Section(title: 'À propos', child: const _AppVersion()),
-          if (user != null)
             const _Section(
               title: 'Supprimer le compte',
               child: DeleteAccountForm(),
             ),
+          ],
+          _Section(title: 'À propos', child: const _AppVersion()),
         ],
       ),
     );
@@ -113,45 +107,6 @@ class _ThemeChoice extends ConsumerWidget {
   };
 }
 
-class _ServerChoice extends ConsumerWidget {
-  const _ServerChoice();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final baseUrl = ref.watch(apiBaseUrlProvider);
-    return Column(
-      children: [
-        ListTile(
-          key: const Key('serverUrlTile'),
-          contentPadding: EdgeInsets.zero,
-          title: const Text('URL du serveur'),
-          subtitle: Text(baseUrl),
-          trailing: const Icon(Icons.edit_outlined),
-          onTap: () => _edit(context, ref, baseUrl),
-        ),
-        if (!ref.read(apiBaseUrlProvider.notifier).isDefault)
-          ListTile(
-            key: const Key('resetServerUrlTile'),
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.restart_alt),
-            title: const Text('Revenir au serveur par défaut'),
-            onTap: () => ref.read(apiBaseUrlProvider.notifier).reset(),
-          ),
-      ],
-    );
-  }
-
-  Future<void> _edit(BuildContext context, WidgetRef ref, String current) async {
-    final url = await showDialog<String>(
-      context: context,
-      builder: (_) => _ServerUrlDialog(initialValue: current),
-    );
-    if (url != null) {
-      await ref.read(apiBaseUrlProvider.notifier).update(url);
-    }
-  }
-}
-
 class _AppVersion extends ConsumerWidget {
   const _AppVersion();
 
@@ -194,69 +149,6 @@ class _Section extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Saisie de l'URL du serveur. La validation refuse tout ce qui n'est pas une
-/// origine (`https://exemple.fr`) : les chemins d'API sont ajoutés par le code.
-class _ServerUrlDialog extends StatefulWidget {
-  final String initialValue;
-
-  const _ServerUrlDialog({required this.initialValue});
-
-  @override
-  State<_ServerUrlDialog> createState() => _ServerUrlDialogState();
-}
-
-class _ServerUrlDialogState extends State<_ServerUrlDialog> {
-  late final TextEditingController _controller = TextEditingController(
-    text: widget.initialValue,
-  );
-  String? _error;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final error = BackendUrl.validate(_controller.text);
-    if (error != null) {
-      setState(() => _error = error);
-      return;
-    }
-    Navigator.of(context).pop(_controller.text.trim());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('URL du serveur'),
-      content: TextField(
-        key: const Key('serverUrlField'),
-        controller: _controller,
-        decoration: InputDecoration(
-          hintText: 'https://bible.dtfh.fr',
-          errorText: _error,
-        ),
-        keyboardType: TextInputType.url,
-        autocorrect: false,
-        autofocus: true,
-        onSubmitted: (_) => _submit(),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
-        ),
-        FilledButton(
-          key: const Key('serverUrlSubmitButton'),
-          onPressed: _submit,
-          child: const Text('Enregistrer'),
-        ),
-      ],
     );
   }
 }

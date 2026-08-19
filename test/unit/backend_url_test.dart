@@ -23,33 +23,6 @@ void main() {
     });
   });
 
-  group('BackendUrl.validate', () {
-    test('accepte une origine', () {
-      expect(BackendUrl.validate('https://bible.dtfh.fr'), isNull);
-    });
-
-    test('refuse une URL sans schéma', () {
-      expect(BackendUrl.validate('bible.dtfh.fr'), isNotNull);
-    });
-
-    test('refuse une URL comportant un chemin', () {
-      expect(
-        BackendUrl.validate('https://bible.dtfh.fr/api'),
-        contains('sans chemin'),
-      );
-    });
-  });
-
-  group('BackendUrl.join', () {
-    test('écrase la barre oblique intermédiaire', () {
-      expect(
-        BackendUrl.join('https://x.fr/', '/api/me'),
-        'https://x.fr/api/me',
-      );
-      expect(BackendUrl.join('https://x.fr', 'api/me'), 'https://x.fr/api/me');
-    });
-  });
-
   group('BackendEndpoints.isPublic', () {
     test('connexion et inscription sont publiques', () {
       expect(BackendEndpoints.isPublic(BackendEndpoints.login), isTrue);

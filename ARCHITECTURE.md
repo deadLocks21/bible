@@ -401,15 +401,13 @@ SourceApplicationService sourceService(Ref ref) {
 
 ### 🚀 Lancer l'application
 
-L'URL du serveur est fournie à la compilation. Sans `--dart-define`, l'application vise la production (`https://bible.dtfh.fr`).
+L'URL du serveur est fournie à la compilation, et seulement là. Sans `--dart-define`, l'application vise la production (`https://bible.dtfh.fr`).
 
 ```bash
 flutter run --dart-define=API_BASE_URL=http://localhost:8000
 ```
 
 Sur émulateur Android, `localhost` désigne l'émulateur lui-même : viser `http://10.0.2.2:8000` pour joindre la machine hôte.
-
-L'écran Réglages permet aussi de changer de serveur à l'exécution ; la valeur enregistrée prime alors sur celle du build, jusqu'à réinitialisation.
 
 #### Lister les appareils disponibles
 

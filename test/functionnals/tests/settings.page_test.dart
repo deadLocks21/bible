@@ -1,8 +1,6 @@
 import 'package:bible/core/domain/exceptions/profile.exception.dart';
 import 'package:bible/core/domain/model/app_theme_mode.dart';
-import 'package:bible/infrastructure/http/providers/api_base_url.provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -73,7 +71,7 @@ void main() {
       await _openFromLogin(tester);
 
       expect(find.text('Apparence'), findsOneWidget);
-      expect(find.byKey(const Key('serverUrlTile')), findsOneWidget);
+      expect(find.byKey(const Key('appVersionTile')), findsOneWidget);
       // Rien qui suppose un compte : ni formulaire, ni déconnexion.
       expect(find.byKey(const Key('profileNameField')), findsNothing);
       expect(find.byKey(const Key('deleteAccountButton')), findsNothing);
@@ -96,68 +94,6 @@ void main() {
       expect(find.text('1.2.3 (45)'), findsOneWidget);
     });
 
-    testWidgets('affichent le serveur du build par défaut', (tester) async {
-      await pumpApp(tester);
-      await _openFromLogin(tester);
-
-      expect(find.text(ApiBaseUrl.kProductionApiBaseUrl), findsOneWidget);
-      // Rien à réinitialiser tant que l'utilisateur n'a rien changé.
-      expect(find.byKey(const Key('resetServerUrlTile')), findsNothing);
-    });
-
-    testWidgets('enregistrent une autre URL de serveur, sans son chemin', (
-      tester,
-    ) async {
-      final app = await pumpApp(tester);
-      await _openFromLogin(tester);
-
-      await _tap(tester, const Key('serverUrlTile'));
-      await tester.enterText(
-        find.byKey(const Key('serverUrlField')),
-        'https://recette.bible.test/',
-      );
-      await tester.tap(find.byKey(const Key('serverUrlSubmitButton')));
-      await tester.pumpAndSettle();
-
-      expect(app.settings.url, 'https://recette.bible.test');
-      expect(find.text('https://recette.bible.test'), findsOneWidget);
-      expect(find.byKey(const Key('resetServerUrlTile')), findsOneWidget);
-    });
-
-    testWidgets('refusent une URL comportant un chemin', (tester) async {
-      final app = await pumpApp(tester);
-      await _openFromLogin(tester);
-
-      await _tap(tester, const Key('serverUrlTile'));
-      await tester.enterText(
-        find.byKey(const Key('serverUrlField')),
-        'https://bible.test/api',
-      );
-      await tester.tap(find.byKey(const Key('serverUrlSubmitButton')));
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('sans chemin'), findsOneWidget);
-      expect(app.settings.url, isNull);
-    });
-
-    testWidgets('reviennent au serveur du build', (tester) async {
-      final app = await pumpApp(
-        tester,
-        settings: FakeSettingsRepository(url: 'https://recette.bible.test'),
-      );
-      // `main` charge l'URL enregistrée avant le premier écran.
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(MaterialApp)),
-      );
-      await container.read(apiBaseUrlProvider.notifier).load();
-      await tester.pumpAndSettle();
-      await _openFromLogin(tester);
-
-      await _tap(tester, const Key('resetServerUrlTile'));
-
-      expect(app.settings.url, isNull);
-      expect(find.text(ApiBaseUrl.kProductionApiBaseUrl), findsOneWidget);
-    });
   });
 
   group('Réglages — compte', () {
@@ -191,6 +127,7 @@ void main() {
       );
       await _openFromDashboard(tester);
 
+      await _scrollTo(tester, find.byKey(const Key('profileNameField')));
       await tester.enterText(
         find.byKey(const Key('profileNameField')),
         'Marie',
@@ -232,6 +169,7 @@ void main() {
       );
       await _openFromDashboard(tester);
 
+      await _scrollTo(tester, find.byKey(const Key('currentPasswordField')));
       await tester.enterText(
         find.byKey(const Key('currentPasswordField')),
         'ancien',
