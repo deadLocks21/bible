@@ -1,4 +1,5 @@
 import 'package:bible/core/domain/exceptions/auth.exception.dart';
+import 'package:bible/core/domain/model/app_theme_mode.dart';
 import 'package:bible/core/domain/exceptions/profile.exception.dart';
 import 'package:bible/core/domain/exceptions/reading.exception.dart';
 import 'package:bible/core/domain/model/auth_session.dart';
@@ -7,6 +8,8 @@ import 'package:bible/core/domain/model/user.dart';
 import 'package:bible/core/domain/services/auth.repository.dart';
 import 'package:bible/core/domain/services/profile.repository.dart';
 import 'package:bible/core/domain/services/reading.repository.dart';
+import 'package:bible/core/domain/services/settings.repository.dart';
+import 'package:bible/core/domain/services/theme.repository.dart';
 
 import '../../builders/builders.dart';
 
@@ -127,4 +130,32 @@ class FakeProfileRepository implements ProfileRepository {
     if (error != null) throw error;
     deletedWithPassword = password;
   }
+}
+
+/// Réglages conservés en mémoire, pour vérifier ce que l'écran persiste.
+class FakeSettingsRepository implements SettingsRepository {
+  String? url;
+
+  FakeSettingsRepository({this.url});
+
+  @override
+  Future<String?> getBackendUrl() async => url;
+
+  @override
+  Future<void> setBackendUrl(String value) async => url = value;
+
+  @override
+  Future<void> clearBackendUrl() async => url = null;
+}
+
+class FakeThemeRepository implements ThemeRepository {
+  AppThemeMode mode;
+
+  FakeThemeRepository({this.mode = AppThemeMode.system});
+
+  @override
+  Future<AppThemeMode> getThemeMode() async => mode;
+
+  @override
+  Future<void> setThemeMode(AppThemeMode value) async => mode = value;
 }

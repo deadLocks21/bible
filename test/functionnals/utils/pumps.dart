@@ -5,6 +5,8 @@ import 'package:bible/infrastructure/auth/providers/auth.repository_provider.dar
 import 'package:bible/infrastructure/auth/providers/auth_token_store.provider.dart';
 import 'package:bible/infrastructure/profile/providers/profile.repository_provider.dart';
 import 'package:bible/infrastructure/reading/providers/reading.repository_provider.dart';
+import 'package:bible/infrastructure/settings/providers/settings.repository_provider.dart';
+import 'package:bible/infrastructure/theme/providers/theme.repository_provider.dart';
 import 'package:bible/ui/pages/auth/auth_gate.dart';
 import 'package:bible/ui/theme/app_theme_data.dart';
 import 'package:flutter/material.dart';
@@ -19,12 +21,16 @@ class TestApp {
   final FakeAuthRepository auth;
   final FakeReadingRepository reading;
   final FakeProfileRepository profile;
+  final FakeSettingsRepository settings;
+  final FakeThemeRepository theme;
   final AuthTokenStore tokenStore;
 
   const TestApp({
     required this.auth,
     required this.reading,
     required this.profile,
+    required this.settings,
+    required this.theme,
     required this.tokenStore,
   });
 }
@@ -40,11 +46,15 @@ Future<TestApp> pumpApp(
   FakeAuthRepository? auth,
   FakeReadingRepository? reading,
   FakeProfileRepository? profile,
+  FakeSettingsRepository? settings,
+  FakeThemeRepository? theme,
 }) async {
   final app = TestApp(
     auth: auth ?? FakeAuthRepository(),
     reading: reading ?? FakeReadingRepository(),
     profile: profile ?? FakeProfileRepository(),
+    settings: settings ?? FakeSettingsRepository(),
+    theme: theme ?? FakeThemeRepository(),
     tokenStore: InMemoryAuthTokenStore(session),
   );
 
@@ -54,6 +64,8 @@ Future<TestApp> pumpApp(
         authRepositoryProvider.overrideWithValue(app.auth),
         readingRepositoryProvider.overrideWithValue(app.reading),
         profileRepositoryProvider.overrideWithValue(app.profile),
+        settingsRepositoryProvider.overrideWithValue(app.settings),
+        themeRepositoryProvider.overrideWithValue(app.theme),
         authTokenStoreProvider.overrideWithValue(app.tokenStore),
       ],
       child: MaterialApp(

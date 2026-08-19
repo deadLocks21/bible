@@ -1,45 +1,63 @@
+import 'package:bible/core/domain/exceptions/profile.exception.dart';
 import 'package:bible/core/domain/model/app_theme_mode.dart';
-import 'package:bible/core/domain/services/settings.repository.dart';
-import 'package:bible/core/domain/services/theme.repository.dart';
 import 'package:bible/infrastructure/http/providers/api_base_url.provider.dart';
-import 'package:bible/infrastructure/settings/providers/settings.repository_provider.dart';
-import 'package:bible/infrastructure/theme/providers/theme.repository_provider.dart';
-import 'package:bible/ui/pages/settings/settings.page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-class _InMemorySettingsRepository implements SettingsRepository {
-  String? url;
+import '../../builders/builders.dart';
+import '../utils/fake_repositories.dart';
+import '../utils/pumps.dart';
 
-  @override
-  Future<String?> getBackendUrl() async => url;
-
-  @override
-  Future<void> setBackendUrl(String value) async => url = value;
-
-  @override
-  Future<void> clearBackendUrl() async => url = null;
+/// Ouvre les réglages depuis l'écran de connexion — le chemin emprunté avant
+/// d'avoir un compte, quand il s'agit de changer de serveur.
+Future<void> _openFromLogin(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('loginSettingsButton')));
+  await tester.pumpAndSettle();
 }
 
-class _InMemoryThemeRepository implements ThemeRepository {
-  AppThemeMode mode = AppThemeMode.system;
+/// Ouvre les réglages depuis le tableau de bord, session en cours.
+Future<void> _openFromDashboard(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('dashboardSettingsButton')));
+  await tester.pumpAndSettle();
+}
 
-  @override
-  Future<AppThemeMode> getThemeMode() async => mode;
+/// Fait défiler jusqu'à la cible : connecté, l'écran empile assez de sections
+/// pour que les dernières sortent de la fenêtre de test — et la liste ne
+/// construit que ce qu'elle affiche.
+Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
+  if (finder.evaluate().isEmpty) {
+    await tester.scrollUntilVisible(
+      finder,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+  } else {
+    await tester.ensureVisible(finder);
+  }
+  await tester.pumpAndSettle();
+}
 
-  @override
-  Future<void> setThemeMode(AppThemeMode value) async => mode = value;
+/// Fait défiler jusqu'à la cible avant d'appuyer.
+Future<void> _tap(WidgetTester tester, Key key) async {
+  final finder = find.byKey(key);
+  if (finder.evaluate().isEmpty) {
+    await tester.scrollUntilVisible(
+      finder,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+  } else {
+    await tester.ensureVisible(finder);
+  }
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
 }
 
 void main() {
-  late _InMemorySettingsRepository settings;
-  late _InMemoryThemeRepository theme;
-
   setUp(() {
-    settings = _InMemorySettingsRepository();
-    theme = _InMemoryThemeRepository();
     PackageInfo.setMockInitialValues(
       appName: 'Bible',
       packageName: 'fr.dtfh.bible',
@@ -49,50 +67,51 @@ void main() {
     );
   });
 
-  Future<void> pumpSettings(WidgetTester tester) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          settingsRepositoryProvider.overrideWithValue(settings),
-          themeRepositoryProvider.overrideWithValue(theme),
-        ],
-        child: const MaterialApp(home: SettingsPage()),
-      ),
-    );
-    await tester.pumpAndSettle();
-  }
+  group('Réglages — préférences de l\'application', () {
+    testWidgets('sont accessibles avant toute connexion', (tester) async {
+      await pumpApp(tester);
+      await _openFromLogin(tester);
 
-  group('Écran de réglages', () {
-    testWidgets('enregistre le thème choisi', (tester) async {
-      await pumpSettings(tester);
-
-      await tester.tap(find.byKey(const Key('themeMode_dark')));
-      await tester.pumpAndSettle();
-
-      expect(theme.mode, AppThemeMode.dark);
+      expect(find.text('Apparence'), findsOneWidget);
+      expect(find.byKey(const Key('serverUrlTile')), findsOneWidget);
+      // Rien qui suppose un compte : ni formulaire, ni déconnexion.
+      expect(find.byKey(const Key('profileNameField')), findsNothing);
+      expect(find.byKey(const Key('deleteAccountButton')), findsNothing);
+      expect(find.byKey(const Key('signOutButton')), findsNothing);
     });
 
-    testWidgets('affiche la version installée', (tester) async {
-      await pumpSettings(tester);
+    testWidgets('enregistrent le thème choisi', (tester) async {
+      final app = await pumpApp(tester);
+      await _openFromLogin(tester);
+
+      await _tap(tester, const Key('themeMode_dark'));
+
+      expect(app.theme.mode, AppThemeMode.dark);
+    });
+
+    testWidgets('affichent la version installée', (tester) async {
+      await pumpApp(tester);
+      await _openFromLogin(tester);
 
       expect(find.text('1.2.3 (45)'), findsOneWidget);
     });
 
-    testWidgets('affiche le serveur du build par défaut', (tester) async {
-      await pumpSettings(tester);
+    testWidgets('affichent le serveur du build par défaut', (tester) async {
+      await pumpApp(tester);
+      await _openFromLogin(tester);
 
       expect(find.text(ApiBaseUrl.kProductionApiBaseUrl), findsOneWidget);
       // Rien à réinitialiser tant que l'utilisateur n'a rien changé.
       expect(find.byKey(const Key('resetServerUrlTile')), findsNothing);
     });
 
-    testWidgets('enregistre une autre URL de serveur, sans son chemin', (
+    testWidgets('enregistrent une autre URL de serveur, sans son chemin', (
       tester,
     ) async {
-      await pumpSettings(tester);
+      final app = await pumpApp(tester);
+      await _openFromLogin(tester);
 
-      await tester.tap(find.byKey(const Key('serverUrlTile')));
-      await tester.pumpAndSettle();
+      await _tap(tester, const Key('serverUrlTile'));
       await tester.enterText(
         find.byKey(const Key('serverUrlField')),
         'https://recette.bible.test/',
@@ -100,16 +119,16 @@ void main() {
       await tester.tap(find.byKey(const Key('serverUrlSubmitButton')));
       await tester.pumpAndSettle();
 
-      expect(settings.url, 'https://recette.bible.test');
+      expect(app.settings.url, 'https://recette.bible.test');
       expect(find.text('https://recette.bible.test'), findsOneWidget);
       expect(find.byKey(const Key('resetServerUrlTile')), findsOneWidget);
     });
 
-    testWidgets('refuse une URL comportant un chemin', (tester) async {
-      await pumpSettings(tester);
+    testWidgets('refusent une URL comportant un chemin', (tester) async {
+      final app = await pumpApp(tester);
+      await _openFromLogin(tester);
 
-      await tester.tap(find.byKey(const Key('serverUrlTile')));
-      await tester.pumpAndSettle();
+      await _tap(tester, const Key('serverUrlTile'));
       await tester.enterText(
         find.byKey(const Key('serverUrlField')),
         'https://bible.test/api',
@@ -118,24 +137,193 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('sans chemin'), findsOneWidget);
-      expect(settings.url, isNull);
+      expect(app.settings.url, isNull);
     });
 
-    testWidgets('revient au serveur du build', (tester) async {
-      settings.url = 'https://recette.bible.test';
-      await pumpSettings(tester);
-      // L'écran lit l'URL du build ; on la remplace comme le ferait `main`.
+    testWidgets('reviennent au serveur du build', (tester) async {
+      final app = await pumpApp(
+        tester,
+        settings: FakeSettingsRepository(url: 'https://recette.bible.test'),
+      );
+      // `main` charge l'URL enregistrée avant le premier écran.
       final container = ProviderScope.containerOf(
-        tester.element(find.byType(SettingsPage)),
+        tester.element(find.byType(MaterialApp)),
       );
       await container.read(apiBaseUrlProvider.notifier).load();
       await tester.pumpAndSettle();
+      await _openFromLogin(tester);
 
-      await tester.tap(find.byKey(const Key('resetServerUrlTile')));
+      await _tap(tester, const Key('resetServerUrlTile'));
+
+      expect(app.settings.url, isNull);
+      expect(find.text(ApiBaseUrl.kProductionApiBaseUrl), findsOneWidget);
+    });
+  });
+
+  group('Réglages — compte', () {
+    testWidgets('préremplissent le formulaire avec le compte connecté', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        session: anAuthSession(
+          user: aUser(name: 'Jean', email: 'jean@example.com'),
+        ),
+        reading: FakeReadingRepository(board: aReadingBoard()),
+      );
+      await _openFromDashboard(tester);
+
+      expect(find.widgetWithText(TextFormField, 'Jean'), findsOneWidget);
+      expect(
+        find.widgetWithText(TextFormField, 'jean@example.com'),
+        findsOneWidget,
+      );
+      // Les préférences restent accessibles depuis le même écran, plus bas.
+      await _scrollTo(tester, find.text('Apparence'));
+      expect(find.text('Apparence'), findsOneWidget);
+    });
+
+    testWidgets('enregistrent nom et e-mail', (tester) async {
+      final app = await pumpApp(
+        tester,
+        session: anAuthSession(),
+        reading: FakeReadingRepository(board: aReadingBoard()),
+      );
+      await _openFromDashboard(tester);
+
+      await tester.enterText(
+        find.byKey(const Key('profileNameField')),
+        'Marie',
+      );
+      await _tap(tester, const Key('profileSubmitButton'));
+
+      expect(app.profile.updatedUser?.name, 'Marie');
+      expect(find.byKey(const Key('profileSavedLabel')), findsOneWidget);
+    });
+
+    testWidgets('affichent l\'erreur du serveur sur le champ concerné', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        session: anAuthSession(),
+        reading: FakeReadingRepository(board: aReadingBoard()),
+        profile: FakeProfileRepository(
+          failure: const ProfileException(
+            'Vérifiez les informations saisies.',
+            fieldErrors: {'email': 'Cette adresse est déjà utilisée.'},
+          ),
+        ),
+      );
+      await _openFromDashboard(tester);
+
+      await _tap(tester, const Key('profileSubmitButton'));
+
+      expect(find.text('Cette adresse est déjà utilisée.'), findsOneWidget);
+    });
+
+    testWidgets('changent le mot de passe et vident les champs', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        session: anAuthSession(),
+        reading: FakeReadingRepository(board: aReadingBoard()),
+      );
+      await _openFromDashboard(tester);
+
+      await tester.enterText(
+        find.byKey(const Key('currentPasswordField')),
+        'ancien',
+      );
+      await tester.enterText(
+        find.byKey(const Key('newPasswordField')),
+        'nouveau',
+      );
+      await tester.enterText(
+        find.byKey(const Key('newPasswordConfirmationField')),
+        'nouveau',
+      );
+      await _tap(tester, const Key('passwordSubmitButton'));
+
+      expect(find.byKey(const Key('passwordSavedLabel')), findsOneWidget);
+      final field = tester.widget<TextFormField>(
+        find.byKey(const Key('currentPasswordField')),
+      );
+      expect(field.controller?.text, isEmpty);
+    });
+
+    testWidgets('la déconnexion ramène à l\'écran de connexion', (
+      tester,
+    ) async {
+      final app = await pumpApp(
+        tester,
+        session: anAuthSession(),
+        reading: FakeReadingRepository(board: aReadingBoard()),
+      );
+      await _openFromDashboard(tester);
+
+      await tester.tap(find.byKey(const Key('signOutButton')));
       await tester.pumpAndSettle();
 
-      expect(settings.url, isNull);
-      expect(find.text(ApiBaseUrl.kProductionApiBaseUrl), findsOneWidget);
+      expect(find.byKey(const Key('loginSubmitButton')), findsOneWidget);
+      expect(app.auth.signOutCalls, 1);
+      expect(await app.tokenStore.read(), isNull);
+    });
+
+    testWidgets(
+      'la suppression du compte demande le mot de passe puis déconnecte',
+      (tester) async {
+        final app = await pumpApp(
+          tester,
+          session: anAuthSession(),
+          reading: FakeReadingRepository(board: aReadingBoard()),
+        );
+        await _openFromDashboard(tester);
+
+        await _tap(tester, const Key('deleteAccountButton'));
+        await tester.enterText(
+          find.byKey(const Key('deleteAccountPasswordField')),
+          'secret',
+        );
+        await tester.tap(find.byKey(const Key('deleteAccountConfirmButton')));
+        await tester.pumpAndSettle();
+
+        expect(app.profile.deletedWithPassword, 'secret');
+        expect(find.byKey(const Key('loginSubmitButton')), findsOneWidget);
+        expect(await app.tokenStore.read(), isNull);
+      },
+    );
+
+    testWidgets('un mot de passe erroné laisse la boîte de dialogue ouverte', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        session: anAuthSession(),
+        reading: FakeReadingRepository(board: aReadingBoard()),
+        profile: FakeProfileRepository(
+          failure: const ProfileException(
+            'Vérifiez les informations saisies.',
+            fieldErrors: {'password': 'Le mot de passe est incorrect.'},
+          ),
+        ),
+      );
+      await _openFromDashboard(tester);
+
+      await _tap(tester, const Key('deleteAccountButton'));
+      await tester.enterText(
+        find.byKey(const Key('deleteAccountPasswordField')),
+        'faux',
+      );
+      await tester.tap(find.byKey(const Key('deleteAccountConfirmButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Le mot de passe est incorrect.'), findsOneWidget);
+      expect(
+        find.byKey(const Key('deleteAccountConfirmButton')),
+        findsOneWidget,
+      );
     });
   });
 }
