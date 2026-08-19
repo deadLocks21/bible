@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- L'application ne fonctionne qu'avec son API : la permission doit être
+         déclarée ici, et pas seulement dans le manifeste de debug que
+         `flutter create` fournit, sinon les builds de release n'ont pas de
+         réseau. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="Bible"
         android:name="${applicationName}"
