@@ -30,6 +30,10 @@ class BibleReader extends StatefulWidget {
 }
 
 class _BibleReaderState extends State<BibleReader> {
+  /// Largeur maximale du lecteur. Au-delà, la vidéo écraserait la page sans
+  /// se regarder mieux ; en deçà — un téléphone — la contrainte ne mord pas.
+  static const double _maxPlayerWidth = 640;
+
   InAppWebViewController? _controller;
   late final List<String> _ids;
   int _index = 0;
@@ -60,69 +64,80 @@ class _BibleReaderState extends State<BibleReader> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Pas de `ClipRRect` autour du lecteur : arrondir les angles d'une vue
-        // native impose au moteur d'insérer des vues de masquage entre elle et
-        // la surface Flutter, et le test de survol d'un clic doit alors les
-        // traverser — la partie haute du lecteur en devenait inatteignable.
-        AspectRatio(
-          aspectRatio: 16 / 9,
-          child: InAppWebView(
-            key: const Key('bibleReaderPlayer'),
-            initialData: InAppWebViewInitialData(
-              data: _buildPage(_ids),
-              // La page doit se présenter sous une origine *tierce* : YouTube
-              // refuse la lecture — « vidéo indisponible » — à qui l'intègre en
-              // se déclarant youtube.com. L'origine annoncée ici et celle passée
-              // au lecteur (`origin`) doivent concorder.
-              baseUrl: WebUri(_embedOrigin),
+    // Le lecteur et ses boutons sont bornés en largeur puis centrés : étalés
+    // sur un écran d'ordinateur, ils écraseraient le reste de la page — et une
+    // vidéo de deux mètres de large ne se regarde pas mieux. Sur téléphone, la
+    // contrainte ne mord jamais.
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _maxPlayerWidth),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Pas de `ClipRRect` autour du lecteur : arrondir les angles d'une
+            // vue native impose au moteur d'insérer des vues de masquage entre
+            // elle et la surface Flutter, et le test de survol d'un clic doit
+            // alors les traverser — la partie haute du lecteur en devenait
+            // inatteignable.
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: InAppWebView(
+                key: const Key('bibleReaderPlayer'),
+                initialData: InAppWebViewInitialData(
+                  data: _buildPage(_ids),
+                  // La page doit se présenter sous une origine *tierce* :
+                  // YouTube refuse la lecture — « vidéo indisponible » — à qui
+                  // l'intègre en se déclarant youtube.com. L'origine annoncée
+                  // ici et celle passée au lecteur (`origin`) doivent concorder.
+                  baseUrl: WebUri(_embedOrigin),
+                ),
+                initialSettings: InAppWebViewSettings(
+                  transparentBackground: false,
+                  // Sans quoi la vidéo partirait dans le lecteur plein écran du
+                  // système au lieu de rester dans la page.
+                  allowsInlineMediaPlayback: true,
+                  // Le plein écran demandé par le lecteur YouTube lui-même.
+                  iframeAllowFullscreen: true,
+                  isElementFullscreenEnabled: true,
+                  // La page fait exactement la taille du lecteur : tout
+                  // défilement ou zoom ne ferait que déplacer la vidéo dans son
+                  // cadre.
+                  supportZoom: false,
+                  disableHorizontalScroll: true,
+                  disableVerticalScroll: true,
+                ),
+                onWebViewCreated: (controller) {
+                  _controller = controller;
+                  controller.addJavaScriptHandler(
+                    handlerName: 'chapter',
+                    callback: _onChapterChanged,
+                  );
+                },
+              ),
             ),
-            initialSettings: InAppWebViewSettings(
-              transparentBackground: false,
-              // Sans quoi la vidéo partirait dans le lecteur plein écran du
-              // système au lieu de rester dans la page.
-              allowsInlineMediaPlayback: true,
-              // Le plein écran demandé par le lecteur YouTube lui-même.
-              iframeAllowFullscreen: true,
-              isElementFullscreenEnabled: true,
-              // La page fait exactement la taille du lecteur : tout défilement
-              // ou zoom ne ferait que déplacer la vidéo dans son cadre.
-              supportZoom: false,
-              disableHorizontalScroll: true,
-              disableVerticalScroll: true,
-            ),
-            onWebViewCreated: (controller) {
-              _controller = controller;
-              controller.addJavaScriptHandler(
-                handlerName: 'chapter',
-                callback: _onChapterChanged,
-              );
-            },
-          ),
+            if (widget.videos.length > 1) ...[
+              const SizedBox(height: 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (var i = 0; i < widget.videos.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 8),
+                      _ChapterButton(
+                        label: widget.videos[i].label,
+                        selected: i == _index,
+                        onPressed: () => _controller?.evaluateJavascript(
+                          source: 'playChapter($i);',
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
-        if (widget.videos.length > 1) ...[
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (var i = 0; i < widget.videos.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 8),
-                  _ChapterButton(
-                    label: widget.videos[i].label,
-                    selected: i == _index,
-                    onPressed: () => _controller?.evaluateJavascript(
-                      source: 'playChapter($i);',
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 }

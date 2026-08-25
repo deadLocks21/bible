@@ -9,6 +9,7 @@ library;
 
 import 'package:bible/core/domain/exceptions/reading.exception.dart';
 import 'package:bible/core/domain/model/reading_board.dart';
+import 'package:bible/core/domain/model/bible_chapter_video.dart';
 import 'package:bible/core/domain/model/reading_entry.dart';
 import 'package:bible/core/domain/model/reading_history.dart';
 import 'package:bible/core/domain/model/reading_plan.dart';
@@ -80,7 +81,26 @@ class PreviewReadingRepository implements ReadingRepository {
 
   late List<ReadingEntry> _entries = [
     for (var i = 0; i < 6; i++)
-      ReadingEntry(id: 'entry-$i', passages: _passages[i % _passages.length]),
+      ReadingEntry(
+        id: 'entry-$i',
+        passages: _passages[i % _passages.length],
+        // Seule la lecture du jour porte des vidéos : c'est la seule que
+        // l'écran donne à écouter, et le lecteur est ce qu'on vient regarder.
+        videos: i == 0 ? _videos : const [],
+      ),
+  ];
+
+  static const _videos = [
+    BibleChapterVideo(
+      youtubeVideoId: '2kJ5n239X6A',
+      book: 'Genèse',
+      chapter: 1,
+    ),
+    BibleChapterVideo(
+      youtubeVideoId: 'F4isSyennFo',
+      book: 'Genèse',
+      chapter: 2,
+    ),
   ];
 
   /// 84 lectures passées, une par jour, en remontant depuis hier.
