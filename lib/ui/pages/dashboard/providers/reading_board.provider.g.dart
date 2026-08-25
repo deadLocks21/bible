@@ -46,7 +46,7 @@ final class ReadingBoardNotifierProvider
 }
 
 String _$readingBoardNotifierHash() =>
-    r'8082dfbfce0d18b89d06ccc8ac3ec782663510f5';
+    r'ae64e6749efa1bf5a17c4121cba4109a5ce4dda8';
 
 /// Charge le tableau de bord et le tient à jour.
 ///

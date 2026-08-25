@@ -18,12 +18,14 @@ class RecordedRequest {
   final String path;
   final Object? data;
   final Map<String, dynamic> headers;
+  final Map<String, dynamic> query;
 
   const RecordedRequest({
     required this.method,
     required this.path,
     required this.data,
     required this.headers,
+    this.query = const {},
   });
 }
 
@@ -62,6 +64,7 @@ class _StubAdapter implements HttpClientAdapter {
         path: options.uri.path,
         data: options.data,
         headers: options.headers,
+        query: options.queryParameters,
       ),
     );
     final response = _handler(options);

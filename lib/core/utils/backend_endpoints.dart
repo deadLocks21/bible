@@ -26,9 +26,13 @@ class BackendEndpoints {
   /// Plan actif et prochaines lectures.
   static const String readingPlan = '/api/reading-plan';
 
-  /// Marque une lecture comme lue.
+  /// Marque une lecture comme lue (`POST`), ou la repasse en non lue
+  /// (`DELETE`) : même chemin, la méthode fait la différence.
   static String readEntry(String entryId) =>
       '/api/reading-plan/entries/$entryId/read';
+
+  /// Lectures déjà validées, par pages.
+  static const String readingHistory = '/api/reading-plan/history';
 
   /// Préfixe des routes publiques : l'intercepteur d'authentification n'y
   /// ajoute pas de jeton et n'y interprète pas les 401.

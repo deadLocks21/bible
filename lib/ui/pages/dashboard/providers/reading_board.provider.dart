@@ -78,6 +78,25 @@ class ReadingBoardNotifier extends _$ReadingBoardNotifier {
     }
   }
 
+  /// Repasse une lecture en non lue. Même contrat que [markAsRead] : `null` en
+  /// cas de succès, sinon le message à afficher, sans écraser le tableau.
+  Future<String?> markAsUnread(String entryId) async {
+    final result = await ref
+        .read(readingServiceProvider)
+        .markEntryAsUnread
+        .execute(entryId);
+    switch (result) {
+      case ReadingBoardLoaded(:final board):
+        state = AsyncData(ReadingBoardAvailable(board));
+        return null;
+      case ReadingBoardNoActivePlan(:final message):
+        state = AsyncData(ReadingBoardEmpty(message));
+        return null;
+      case ReadingBoardFailure(:final message):
+        return message;
+    }
+  }
+
   Future<ReadingBoardState> _toState(Future<ReadingBoardResult> future) async {
     final result = await future;
     return switch (result) {

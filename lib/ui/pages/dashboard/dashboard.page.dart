@@ -2,6 +2,7 @@ import 'package:bible/core/application/dtos/reading_board.dto.dart';
 import 'package:bible/core/domain/exceptions/reading.exception.dart';
 import 'package:bible/ui/pages/dashboard/providers/reading_board.provider.dart';
 import 'package:bible/ui/pages/dashboard/widgets/passages_card.widget.dart';
+import 'package:bible/ui/pages/history/history.page.dart';
 import 'package:bible/ui/pages/settings/settings.page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -78,6 +79,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       appBar: AppBar(
         title: Text(title, key: const Key('dashboardTitle')),
         actions: [
+          IconButton(
+            key: const Key('dashboardHistoryButton'),
+            icon: const Icon(Icons.history),
+            tooltip: 'Historique',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const HistoryPage()),
+            ),
+          ),
           IconButton(
             key: const Key('dashboardSettingsButton'),
             icon: const Icon(Icons.settings_outlined),

@@ -1,6 +1,7 @@
 import 'package:bible/core/domain/model/bible_chapter_video.dart';
 import 'package:bible/core/domain/model/reading_board.dart';
 import 'package:bible/core/domain/model/reading_entry.dart';
+import 'package:bible/core/domain/model/reading_history.dart';
 import 'package:bible/core/domain/model/reading_plan.dart';
 
 /// Constructeurs d'objets de domaine pour les tests : des valeurs par défaut
@@ -38,4 +39,16 @@ ReadingBoard aReadingBoard({
         aReadingEntry(),
         aReadingEntry(id: 'entry-2', passages: 'Genèse 4-7'),
       ],
+);
+
+ReadingHistoryEntry aReadingHistoryEntry({
+  String id = 'entry-1',
+  String passages = 'Genèse 1-3',
+  DateTime? readAt,
+  bool canUnread = false,
+}) => ReadingHistoryEntry(
+  id: id,
+  passages: passages,
+  readAt: readAt ?? DateTime(2026, 8, 24, 9, 12),
+  canUnread: canUnread,
 );
