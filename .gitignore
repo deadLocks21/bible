@@ -48,3 +48,6 @@ app.*.map.json
 /android/key.properties
 /android/upload-keystore.jks
 
+# Outillage semantic-release (cf. package.json / .gitlab-ci.yml)
+node_modules/
+.npm/
