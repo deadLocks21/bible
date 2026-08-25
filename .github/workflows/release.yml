@@ -1,0 +1,689 @@
+# Workflow de release consolidé, déclenché sur push d'un tag `v*`.
+# Couvre Android et macOS en parallèle + création GitHub Release.
+#
+# Note macOS : PAS de distribution App Store. macOS n'est distribué qu'en canal
+# DIRECT (build-macos : .app Developer ID notarisé, consommé par
+# tool/updater).
+#
+# Note Android : PAS de Play Store pour l'instant. Android n'est distribué qu'en
+# APK universel sideloadable, attaché à la GitHub Release. Le jour où une fiche
+# Play existe, ajouter le build `appbundle` + un job `publish-android` qui
+# dépend de `release` (cf. la CI kidflix, dont ce fichier est dérivé).
+#
+# Pipeline "fail-fast au build (gate strict) → GitHub Release" :
+#
+#   1) prepare        Calcule la version (depuis le tag ou pubspec.yaml).
+#
+#   2) Builds parallèle (gate strict) :
+#        build-android      → APK universel signé (sideload, attaché) + mapping.txt
+#        build-macos        → .app Developer ID notarisé (hors App Store)
+#        build-updater      → « Bible Installer.app » notarisé (tool/updater)
+#      Si UN SEUL plante, la Release n'est pas créée.
+#
+#   3) build-gate     Job sentinelle qui vérifie que TOUS les builds sont verts —
+#                     dont l'app macOS (build-macos) et l'updater (build-updater).
+#
+#   4) release        Crée la GitHub Release dès le gate franchi.
+#                     Assets attachés : app macOS, installateur macOS, APK
+#                     universel et mapping.txt — cf. le contrat de nommage des
+#                     assets documenté dans le job.
+#                     Notes = changelog semantic-release relu depuis le corps
+#                     du commit `chore(release)` taggé.
+#
+# Secrets requis (Settings → Secrets and variables → Actions) :
+#   APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_ISSUER_ID,
+#   APP_STORE_CONNECT_PRIVATE_KEY,
+#   DEVELOPER_ID_APPLICATION_P12_BASE64, DEVELOPER_ID_APPLICATION_PASSWORD,
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+#   ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD,
+#   SIGNOZ_INGEST_URL, SIGNOZ_INGESTION_KEY
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+# Configuration Signoz partagée entre toutes les plateformes. Injectée dans
+# chaque binaire via `--dart-define` à la compilation. L'app ne les lit pas
+# encore (pas de LoggerService Signoz côté bible) : les blocs sont en place
+# pour le jour où on branche la télémétrie, à l'identique de kidflix.
+#
+# `SIGNOZ_INGEST_URL` vient du secret du même nom (instance self-hosted →
+# l'URL n'est pas codée en dur ici). Il est mappé dans le bloc `env:` de
+# chaque job de build, à côté de `SIGNOZ_INGESTION_KEY`.
+env:
+  SIGNOZ_ENV: "production"
+
+jobs:
+  prepare:
+    name: Compute version
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extrait la version depuis le tag (ou pubspec.yaml)
+        # Tag `v1.2.3` → 1.2.3. Pour `workflow_dispatch` (lancement manuel
+        # sans tag), on retombe sur la version de `pubspec.yaml`.
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//;s/+.*//')
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version: $VERSION"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # BUILDS — Compilation + signature + upload artifact (pas de publish)
+  # ═══════════════════════════════════════════════════════════════════════
+
+  build-android:
+    name: Build Android (${{ needs.prepare.outputs.version }})
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      PACKAGE_NAME: "fr.dtfh.bible"
+      VERSION: ${{ needs.prepare.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java (Temurin 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.0"
+          channel: stable
+          cache: true
+
+      - name: Décoder le keystore upload
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/android/upload-keystore.jks"
+
+      - name: Écrire android/key.properties
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          cat > "$GITHUB_WORKSPACE/android/key.properties" <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=$GITHUB_WORKSPACE/android/upload-keystore.jks
+          EOF
+
+      - run: flutter pub get
+
+      - name: Build APK (.apk)
+        # APK universel attaché à la GitHub Release pour install directe /
+        # sideload. Pas d'AAB tant qu'il n'y a pas de fiche Play Store : le
+        # `.aab` n'est installable par personne. Le build number vient de
+        # `github.run_number` (monotone) faute d'un store qui fasse autorité.
+        env:
+          SIGNOZ_INGEST_URL: ${{ secrets.SIGNOZ_INGEST_URL }}
+          SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
+        run: |
+          flutter build apk --release \
+            --build-name="$VERSION" \
+            --build-number="${{ github.run_number }}" \
+            --dart-define=APP_VERSION="$VERSION+${{ github.run_number }}" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
+
+      # `flutter build apk` sort un `app-release.apk` générique : on le renomme
+      # au schéma d'assets de la Release (cf. job release) avant l'upload, pour
+      # que le nom de l'artifact soit déjà le nom final.
+      - name: Renomme l'APK au schéma bible-android-<version>.apk
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk \
+             "build/app/outputs/flutter-apk/bible-android-${VERSION}.apk"
+
+      - name: Upload APK + mapping artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bible-android
+          path: |
+            build/app/outputs/flutter-apk/*.apk
+            build/app/outputs/mapping/release/mapping.txt
+          retention-days: 14
+          if-no-files-found: error
+
+  # ────────────────────────────────────────────────────────────────────────
+  # BUILD macOS — .app signé Developer ID + notarisé, zippé (ditto), attaché à
+  # la GitHub Release. C'est l'UNIQUE canal de distribution macOS (pas d'App
+  # Store), consommé par l'updater (tool/updater). Deux propriétés clés :
+  #   - PAS de sandbox (entitlements DirectRelease.entitlements) : l'app doit
+  #     piloter la fenêtre de MAJ via des fichiers hors container ;
+  #   - signature « Developer ID Application », puis notarisation Apple → aucune
+  #     alerte Gatekeeper au téléchargement.
+  #
+  # ⚠️ Secrets (Settings → Secrets) :
+  #   DEVELOPER_ID_APPLICATION_P12_BASE64  — cert « Developer ID Application » (.p12 en base64)
+  #   DEVELOPER_ID_APPLICATION_PASSWORD    — mot de passe du .p12
+  # La notarisation utilise la clé APP_STORE_CONNECT_* (notarytool).
+  # ────────────────────────────────────────────────────────────────────────
+  build-macos:
+    name: Build macOS (${{ needs.prepare.outputs.version }})
+    needs: prepare
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    env:
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      DEVELOPER_ID_APPLICATION_P12_BASE64: ${{ secrets.DEVELOPER_ID_APPLICATION_P12_BASE64 }}
+      DEVELOPER_ID_APPLICATION_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_PASSWORD }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.3
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.0"
+          channel: stable
+          cache: true
+
+      - name: Enable macOS desktop support
+        run: flutter config --enable-macos-desktop
+
+      - name: Setup Python (requis par codemagic-cli-tools)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install codemagic-cli-tools
+        run: pip install codemagic-cli-tools
+
+      - name: Initialize keychain
+        run: keychain initialize
+
+      - name: Add Developer ID Application certificate to keychain
+        # Cert account-wide (pas lié à un bundle ID) → importé depuis un secret
+        # base64.
+        run: |
+          P12="$RUNNER_TEMP/developer_id.p12"
+          echo "$DEVELOPER_ID_APPLICATION_P12_BASE64" | base64 --decode > "$P12"
+          keychain add-certificates \
+            -c "$P12" \
+            --certificate-password=@env:DEVELOPER_ID_APPLICATION_PASSWORD
+          security find-identity -v -p codesigning
+
+      - run: flutter pub get
+
+      - name: Cache CocoaPods (macOS)
+        uses: actions/cache@v4
+        with:
+          path: |
+            macos/Pods
+            ~/Library/Caches/CocoaPods
+          key: pods-macos-${{ runner.os }}-${{ hashFiles('macos/Podfile.lock') }}
+          restore-keys: pods-macos-${{ runner.os }}-
+
+      - name: Install CocoaPods dependencies (macOS)
+        run: |
+          cd macos
+          pod install
+
+      - name: Build macOS release (non signé — on re-signe Developer ID ensuite)
+        # On désactive la signature au build (sinon xcodebuild échoue faute de
+        # profil : ce job n'utilise PAS `xcode-project use-profiles`). On signe
+        # nous-mêmes juste après, avec le cert Developer ID + les entitlements
+        # non-sandbox. L'ajout au .xcconfig est éphémère (checkout jetable).
+        env:
+          SIGNOZ_INGEST_URL: ${{ secrets.SIGNOZ_INGEST_URL }}
+          SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
+        run: |
+          cat >> macos/Runner/Configs/Release.xcconfig <<'EOF'
+          CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          CODE_SIGN_STYLE = Manual
+          DEVELOPMENT_TEAM =
+          PROVISIONING_PROFILE_SPECIFIER =
+          EOF
+
+          flutter build macos --release \
+            --build-name="$VERSION" \
+            --build-number="${{ github.run_number }}" \
+            --dart-define=APP_VERSION="$VERSION+${{ github.run_number }}" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
+
+      - name: Sign (Developer ID + hardened runtime, non-sandbox), notarize, staple, zip
+        run: |
+          set -euo pipefail
+
+          APP=$(find build/macos/Build/Products/Release -maxdepth 1 -name '*.app' -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "No .app bundle found"; ls -la build/macos/Build/Products/Release/ || true; exit 1
+          fi
+
+          IDENTITY=$(security find-identity -v -p codesigning \
+            | grep "Developer ID Application" | head -1 \
+            | sed -E 's/^[[:space:]]*[0-9]+\)[[:space:]]+[A-F0-9]+[[:space:]]+"(.*)"$/\1/')
+          if [ -z "$IDENTITY" ]; then
+            echo "ERROR: no Developer ID Application identity"; security find-identity -v; exit 1
+          fi
+          ENT="macos/Runner/DirectRelease.entitlements"
+
+          # Signer les binaires imbriqués (frameworks, dylibs) AVANT le bundle,
+          # tous en hardened runtime (`--options runtime`, requis par notarytool).
+          find "$APP/Contents/Frameworks" -name '*.dylib' -type f -print0 2>/dev/null \
+            | while IFS= read -r -d '' f; do
+                codesign --force --options runtime --timestamp --sign "$IDENTITY" "$f"
+              done
+          find "$APP/Contents/Frameworks" -maxdepth 1 -name '*.framework' -type d -print0 2>/dev/null \
+            | while IFS= read -r -d '' fw; do
+                codesign --force --options runtime --timestamp --sign "$IDENTITY" "$fw"
+              done
+
+          codesign --force --options runtime --timestamp \
+            --entitlements "$ENT" --sign "$IDENTITY" "$APP"
+          codesign --verify --strict --verbose=2 "$APP"
+
+          ZIP="bible-macos-${VERSION}.zip"
+          ditto -c -k --keepParent "$APP" "$ZIP"
+
+          # Notarisation via la clé App Store Connect (écrite dans un .p8 temporaire).
+          KEY="$RUNNER_TEMP/asc_key.p8"
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$KEY"
+          xcrun notarytool submit "$ZIP" \
+            --key "$KEY" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --wait
+
+          # Staple le ticket SUR le .app (impossible sur un .zip), puis re-zippe :
+          # l'app se lance ainsi même hors-ligne, sans vérification en ligne.
+          xcrun stapler staple "$APP"
+          rm -f "$ZIP"
+          ditto -c -k --keepParent "$APP" "$ZIP"
+          echo "MACOS_ZIP=$PWD/$ZIP" >> "$GITHUB_ENV"
+
+      - name: Upload macOS direct artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bible-macos
+          path: ${{ env.MACOS_ZIP }}
+          retention-days: 14
+          if-no-files-found: error
+
+  # ───────────────────────────────────────────────────────────────────────
+  # BUILD UPDATER — binaire `tool/updater`, l'installateur/launcher/auto-updater.
+  # Bootstrap : téléchargé UNE fois, ensuite il met à jour l'app ET lui-même.
+  #
+  # macOS : on ne distribue PAS le binaire nu (téléchargé via navigateur il
+  # serait tué par Gatekeeper — un exécutable nu ne peut pas être « staplé »).
+  # On l'emballe dans « Bible Installer.app », signé Developer ID + notarisé +
+  # STAPLÉ, zippé via ditto. Un .app staplé passe Gatekeeper au double-clic,
+  # hors-ligne. Secrets DEVELOPER_ID_APPLICATION_* + APP_STORE_CONNECT_*.
+  #
+  # La matrice ne contient QUE macOS (seule plateforme desktop distribuée pour
+  # l'instant). Y ajouter Windows/Linux quand ces builds arriveront : le code de
+  # tool/updater est déjà cross-plateforme.
+  # ───────────────────────────────────────────────────────────────────────
+
+  build-updater:
+    name: Build Updater (${{ matrix.label }})
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            label: macOS
+            out: bible-updater-macos
+            artifact: bible-updater-macos
+
+    env:
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      DEVELOPER_ID_APPLICATION_P12_BASE64: ${{ secrets.DEVELOPER_ID_APPLICATION_P12_BASE64 }}
+      DEVELOPER_ID_APPLICATION_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_PASSWORD }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: "3.13.0"
+
+      # ── macOS uniquement : Xcode + import du cert Developer ID ──────────────
+      - name: Select Xcode 26.3
+        if: runner.os == 'macOS'
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
+
+      - name: Setup Python (requis par codemagic-cli-tools)
+        if: runner.os == 'macOS'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install codemagic-cli-tools
+        if: runner.os == 'macOS'
+        run: pip install codemagic-cli-tools
+
+      - name: Initialize keychain
+        if: runner.os == 'macOS'
+        run: keychain initialize
+
+      - name: Add Developer ID Application certificate to keychain
+        if: runner.os == 'macOS'
+        run: |
+          P12="$RUNNER_TEMP/developer_id.p12"
+          echo "$DEVELOPER_ID_APPLICATION_P12_BASE64" | base64 --decode > "$P12"
+          keychain add-certificates \
+            -c "$P12" \
+            --certificate-password=@env:DEVELOPER_ID_APPLICATION_PASSWORD
+
+      - name: Resolve updater deps
+        working-directory: tool/updater
+        run: dart pub get
+
+      # CLI console autonome (pas de Flutter) : `dart compile exe` produit un
+      # binaire natif. Les lancements quotidiens passent par un wrapper caché
+      # (.app lanceur macOS) généré à l'installation.
+      - name: Compile updater
+        working-directory: tool/updater
+        run: dart compile exe bin/bible_updater.dart -o "${{ matrix.out }}"
+
+      # macOS : emballe le binaire dans « Bible Installer.app », signé
+      # Developer ID + hardened runtime, notarisé ET STAPLÉ (possible sur un .app,
+      # pas sur un binaire nu). C'est l'artefact que l'utilisateur télécharge :
+      # un .app staplé passe Gatekeeper au double-clic, hors-ligne, sans `xattr`.
+      # `--options runtime` requis par notarytool — et, avec lui, l'entitlement
+      # `allow-unsigned-executable-memory` (tool/updater/macos/Installer.entitlements)
+      # SANS LEQUEL le binaire Dart AOT est tué au démarrage par le noyau
+      # (SIGKILL / CODESIGNING « Invalid Page ») : `dart compile exe` remappe son
+      # snapshot en mémoire anonyme exécutable. Cf. le commentaire du fichier.
+      - name: Package installer .app (Developer ID + notarize + staple) (macOS)
+        if: runner.os == 'macOS'
+        working-directory: tool/updater
+        run: |
+          set -euo pipefail
+          APP="Bible Installer.app"
+          rm -rf "$APP"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp "${{ matrix.out }}" "$APP/Contents/MacOS/bible-installer"
+          chmod +x "$APP/Contents/MacOS/bible-installer"
+
+          # SECONDE copie du MÊME binaire, signée en autonome plus bas. C'est
+          # elle que l'installateur relocalise dans `<root>/updater/` et que
+          # l'auto-MAJ extrait — cf. _relocatableBinary() dans lib/installer.dart.
+          # L'exécutable principal, lui, se fait sceller le hash de l'Info.plist
+          # par la signature du BUNDLE : copié hors de Contents/MacOS/ il devient
+          # invalide et le hardened runtime le tue au démarrage.
+          cp "${{ matrix.out }}" "$APP/Contents/Resources/bible-updater"
+          chmod +x "$APP/Contents/Resources/bible-updater"
+
+          cat > "$APP/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+          <key>CFBundleName</key><string>Bible Installer</string>
+          <key>CFBundleDisplayName</key><string>Bible Installer</string>
+          <key>CFBundleIdentifier</key><string>fr.dtfh.bible.installer</string>
+          <key>CFBundleExecutable</key><string>bible-installer</string>
+          <key>CFBundlePackageType</key><string>APPL</string>
+          <key>CFBundleIconFile</key><string>AppIcon</string>
+          <key>CFBundleShortVersionString</key><string>1.0</string>
+          <key>CFBundleVersion</key><string>1</string>
+          <key>LSMinimumSystemVersion</key><string>11.0</string>
+          <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          PLIST
+
+          # Icône (best-effort) depuis l'icône de l'app.
+          ICON_SRC="$GITHUB_WORKSPACE/assets/icon/app_icon.png"
+          if [ -f "$ICON_SRC" ]; then
+            mkdir -p AppIcon.iconset
+            for s in 16 32 128 256 512; do
+              sips -z $s $s "$ICON_SRC" --out "AppIcon.iconset/icon_${s}x${s}.png" >/dev/null 2>&1 || true
+              d=$((s * 2)); sips -z $d $d "$ICON_SRC" --out "AppIcon.iconset/icon_${s}x${s}@2x.png" >/dev/null 2>&1 || true
+            done
+            iconutil -c icns AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns" 2>/dev/null || true
+          fi
+
+          IDENTITY=$(security find-identity -v -p codesigning \
+            | grep "Developer ID Application" | head -1 \
+            | sed -E 's/^[[:space:]]*[0-9]+\)[[:space:]]+[A-F0-9]+[[:space:]]+"(.*)"$/\1/')
+          if [ -z "$IDENTITY" ]; then
+            echo "ERROR: no Developer ID Application identity"; security find-identity -v; exit 1
+          fi
+
+          # Signer le binaire interne PUIS le bundle (hardened runtime +
+          # entitlements). Le binaire interne DOIT porter les entitlements : à
+          # l'auto-MAJ, l'updater l'extrait du .app et l'exécute nu.
+          # ORDRE IMPORTANT : la copie relocalisable D'ABORD et SEULE (contexte
+          # hors-bundle → aucun Info.plist scellé dans sa signature), puis
+          # l'exécutable principal, puis le bundle. Signer le bundle re-signe
+          # son exécutable principal mais PAS un Mach-O rangé dans Resources/ :
+          # la copie autonome survit donc intacte.
+          ENT="macos/Installer.entitlements"
+          codesign --force --options runtime --timestamp \
+            --entitlements "$ENT" --sign "$IDENTITY" "$APP/Contents/Resources/bible-updater"
+          codesign --force --options runtime --timestamp \
+            --entitlements "$ENT" --sign "$IDENTITY" "$APP/Contents/MacOS/bible-installer"
+          codesign --force --options runtime --timestamp \
+            --entitlements "$ENT" --sign "$IDENTITY" "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+          # Garde-fous. Un CI qui ne lance jamais rien reste vert avec un
+          # artefact mort-né : on exécute donc pour de vrai les DEUX chemins,
+          # chacun ayant son mode de mort propre.
+          #  1. le .app au double-clic (1re install) : tué sans l'entitlement.
+          #  2. la copie relocalisée hors du bundle (lancement quotidien via
+          #     ~/Applications/Bible.app, et auto-MAJ) : tuée si elle porte
+          #     une signature de bundle.
+          codesign -d --entitlements - --xml "$APP" 2>/dev/null \
+            | grep -q 'allow-unsigned-executable-memory' \
+            || { echo "ERROR: entitlement allow-unsigned-executable-memory absent"; exit 1; }
+          "$APP/Contents/MacOS/bible-installer" --check
+
+          RELOC="$RUNNER_TEMP/reloc-check/bible-updater"
+          mkdir -p "$(dirname "$RELOC")"
+          cp "$APP/Contents/Resources/bible-updater" "$RELOC"
+          chmod +x "$RELOC"
+          codesign --verify --strict "$RELOC" \
+            || { echo "ERROR: la copie relocalisée a une signature invalide hors bundle"; exit 1; }
+          "$RELOC" --check
+
+          # Notariser le .app puis STAPLER le ticket → lancement hors-ligne OK.
+          KEY="$RUNNER_TEMP/asc_key.p8"
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$KEY"
+          ditto -c -k --keepParent "$APP" "installer-unstapled.zip"
+          xcrun notarytool submit "installer-unstapled.zip" \
+            --key "$KEY" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$APP"
+
+          ZIP="bible-installer-macos-${VERSION}.zip"
+          ditto -c -k --keepParent "$APP" "$ZIP"
+          echo "INSTALLER_ZIP=tool/updater/$ZIP" >> "$GITHUB_ENV"
+
+      # Win/Linux (quand la matrice les inclura) : on attache le binaire nu
+      # (téléchargé via curl à l'auto-MAJ, jamais mis en quarantaine).
+      # macOS a son propre upload (.app) ci-dessous.
+      - name: Upload updater artifact
+        if: runner.os != 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: tool/updater/${{ matrix.out }}
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload installer .app (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bible-installer-macos
+          path: ${{ env.INSTALLER_ZIP }}
+          retention-days: 14
+          if-no-files-found: error
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # BUILD GATE — Sentinelle qui valide que les builds sont verts
+  # ═══════════════════════════════════════════════════════════════════════
+
+  build-gate:
+    name: All builds passed
+    # TOUS les builds doivent être verts avant publication — dont l'app macOS
+    # (build-macos) et l'updater (build-updater). Un échec de signature /
+    # notarisation macOS bloque donc tout le pipeline, y compris l'APK Android.
+    needs: [build-android, build-macos, build-updater]
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo "✓ Tous les builds sont verts (apps + updater, dont macOS) — publication autorisée"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # GITHUB RELEASE — Assets installables attachés, dès le gate franchi
+  # ═══════════════════════════════════════════════════════════════════════
+
+  release:
+    name: Create GitHub Release
+    # Déclenchée dès que le gate est franchi (build-gate = tous les builds verts,
+    # dont build-macos) ; build-updater est aussi listé pour attacher ses
+    # binaires.
+    # NB : `prepare` DOIT rester dans needs — needs.<job>.outputs n'est exposé
+    # qu'aux dépendances directes ; sans lui, needs.prepare.outputs.version est
+    # vide et le titre devient « Bible v ».
+    needs: [prepare, build-gate, build-updater]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # `fetch-depth: 0` : le fallback `git describe` (cf. étape "Compose
+          # les notes de release") a besoin des tags et de l'historique.
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Compose les notes de release
+        # semantic-release génère déjà le changelog conventionnel et l'écrit
+        # dans le CORPS du commit `chore(release): X.Y.Z` — celui-là même sur
+        # lequel pointe le tag `vX.Y.Z` qui déclenche ce workflow. On le relit
+        # ici plutôt que d'inventer des notes.
+        run: |
+          set -euo pipefail
+
+          NOTES=""
+
+          # On teste le SUJET, pas le corps : tout commit conventionnel un peu
+          # soigné a un corps, donc "corps non vide" ne prouve rien. Seul
+          # `chore(release):` garantit que le corps est bien le changelog.
+          case "$(git log -1 --format=%s HEAD)" in
+            "chore(release):"*) NOTES=$(git log -1 --format=%b HEAD) ;;
+          esac
+
+          # Fallback : HEAD n'est pas un commit de release → on liste les
+          # commits depuis le dernier tag.
+          if [ -z "$(printf '%s' "$NOTES" | tr -d '[:space:]')" ]; then
+            PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+            # NB : pas d'apostrophe dans le mot par défaut de `${PREV:-...}`,
+            # bash y ré-interprète les quotes même entre guillemets doubles.
+            echo "HEAD n'est pas un commit de release — fallback depuis ${PREV:-le premier commit}"
+            NOTES=$(git log --no-merges --invert-grep --grep='^chore(release)' \
+              --pretty='* %s (%h)' ${PREV:+"$PREV.."}HEAD)
+          fi
+
+          printf '%s\n' "$NOTES" > notes.md
+
+          echo "--- notes.md ---"
+          cat notes.md
+
+      - name: Create GitHub Release
+        run: |
+          set -euo pipefail
+
+          # Schéma des assets : `bible-<plateforme>-<version>.<ext>`, tout en
+          # minuscules, sans numéro de run (la version du tag suffit à situer le
+          # binaire). Ces noms sont un CONTRAT avec les updaters DÉJÀ INSTALLÉS,
+          # qui résolvent les assets de la release `latest` par nom
+          # (tool/updater/lib/github.dart) :
+          #   - app macOS             `^bible-macos-.*\.zip$`
+          #   - installateur macOS    `^bible-installer-macos-.*\.zip$`
+          # Piège : ne jamais renommer l'installateur macOS en
+          # `bible-macos-installer-*` (il matcherait la regex de l'app).
+          #
+          # `mapping.txt` EST attaché volontairement : R8 est actif (le plugin
+          # Gradle de Flutter l'active par défaut en release), et cette table de
+          # désobfuscation est le seul moyen de relire les stack traces des
+          # crashs de la version publiée. C'est le seul asset non installable
+          # qu'on garde — il ne pèse rien à côté des binaires.
+          #
+          # On n'attache par ailleurs que les assets réellement présents :
+          # certaines plateformes peuvent être désactivées, et passer un
+          # argument vide à `gh release create` fait échouer la commande.
+          ASSETS=()
+          echo "Releasing assets:"
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            echo "  - $f"
+            ASSETS+=("$f")
+          done < <(find artifacts -type f \
+            \( -name '*.apk' \
+               -o -name 'mapping.txt' \
+               -o -name '*.zip' \) | sort)
+
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "ERROR: no release assets found"
+            exit 1
+          fi
+
+          RELEASE_TAG="$GITHUB_REF_NAME"
+          echo "Release tag: $RELEASE_TAG"
+
+          gh release create "$RELEASE_TAG" \
+            --title "Bible v$VERSION" \
+            --notes-file notes.md \
+            "${ASSETS[@]}"
