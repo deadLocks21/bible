@@ -54,7 +54,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Connexion'),
         actions: [
           IconButton(
             key: const Key('loginSettingsButton'),
@@ -77,6 +76,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Le titre vit dans la page, pas dans la barre : l'écran
+                    // n'a rien au-dessus de lui, autant lui donner de l'air.
+                    Text(
+                      'Bible',
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Reprenez votre plan de lecture.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
                     if (_error != null) ...[
                       ErrorBanner(
                         key: const Key('authErrorBanner'),

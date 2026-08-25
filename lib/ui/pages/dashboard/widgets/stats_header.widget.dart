@@ -1,5 +1,6 @@
 import 'package:bible/core/application/dtos/reading_stats.dto.dart';
 import 'package:bible/ui/widgets/french_date.dart';
+import 'package:bible/ui/widgets/section_label.widget.dart';
 import 'package:flutter/material.dart';
 
 /// Bandeau de régularité en tête du tableau de bord : la série en cours, le
@@ -37,6 +38,9 @@ class StatsHeader extends StatelessWidget {
       child: InkWell(
         key: const Key('dashboardStatsToggle'),
         onTap: onToggle,
+        // Pas de survol : sur desktop, un aplat qui s'allume au passage de la
+        // souris donne au bandeau l'air d'un bouton, ce qu'il n'est pas.
+        hoverColor: Colors.transparent,
         child: Padding(
           padding: const EdgeInsets.all(16),
           // La taille s'anime : déplier ne doit pas faire sauter la lecture du
@@ -128,29 +132,6 @@ class _Expanded extends StatelessWidget {
 /// « 1 jour », « 5 jours » — l'unité fait toute la lisibilité du chiffre.
 String _days(int count) => count > 1 ? '$count jours' : '$count jour';
 
-/// Intitulé d'une mesure, en capitales espacées — faute de vraies petites
-/// capitales, que la police système ne garantit pas. Le rôle est d'étiqueter
-/// sans concurrencer ce qui est mesuré.
-class _Label extends StatelessWidget {
-  final String text;
-
-  const _Label(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Text(
-      text.toUpperCase(),
-      style: theme.textTheme.labelSmall?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
-        letterSpacing: 1.2,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-}
-
 /// Ce qui est mesuré, puis le chiffre.
 class _Figure extends StatelessWidget {
   final String value;
@@ -165,7 +146,7 @@ class _Figure extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Label(label),
+        SectionLabel(label),
         const SizedBox(height: 2),
         Text(
           value,
@@ -193,7 +174,7 @@ class _Progress extends StatelessWidget {
       // bandeau. Le texte, lui, reste calé à gauche.
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _Label('Avancement'),
+        const SectionLabel('Avancement'),
         const SizedBox(height: 6),
         ClipRRect(
           borderRadius: BorderRadius.circular(4),

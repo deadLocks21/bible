@@ -131,7 +131,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     ReadingHistoryAvailable(:final entries) => ListView.builder(
       controller: _scroll,
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       // Une ligne de plus quand une page suivante reste à charger : elle porte
       // l'indicateur de chargement en bas de liste.
       itemCount: entries.length + (_loadingMore ? 1 : 0),

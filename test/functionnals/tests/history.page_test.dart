@@ -35,9 +35,9 @@ void main() {
 
       expect(find.byKey(const Key('historyTitle')), findsOneWidget);
       expect(find.text('Introduction'), findsOneWidget);
-      expect(find.text('Lu le 24 août 2026 à 09:12'), findsOneWidget);
+      expect(find.text('24 août 2026 à 09:12'), findsOneWidget);
       expect(find.text('Préface'), findsOneWidget);
-      expect(find.text('Lu le 23 août 2026 à 20:05'), findsOneWidget);
+      expect(find.text('23 août 2026 à 20:05'), findsOneWidget);
     });
 
     testWidgets('annonce un historique vide', (tester) async {
@@ -96,7 +96,7 @@ void main() {
       // …et redevient la lecture du jour sur le tableau de bord.
       await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(find.text('Lecture du jour'), findsOneWidget);
+      expect(find.text('LECTURE DU JOUR'), findsOneWidget);
       expect(find.text('Introduction'), findsOneWidget);
     });
 

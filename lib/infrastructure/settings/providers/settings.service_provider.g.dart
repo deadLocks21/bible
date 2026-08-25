@@ -117,3 +117,65 @@ abstract class _$ThemeModeNotifier extends $AsyncNotifier<AppThemeMode> {
     return element.handleCreate(ref, build);
   }
 }
+
+/// Jeu de couleurs courant, relu au démarrage puis maintenu en état.
+///
+/// Un échec de lecture retombe sur [AppPalette.paper] : un réglage illisible ne
+/// doit pas empêcher l'application de s'afficher.
+
+@ProviderFor(PaletteNotifier)
+final paletteProvider = PaletteNotifierProvider._();
+
+/// Jeu de couleurs courant, relu au démarrage puis maintenu en état.
+///
+/// Un échec de lecture retombe sur [AppPalette.paper] : un réglage illisible ne
+/// doit pas empêcher l'application de s'afficher.
+final class PaletteNotifierProvider
+    extends $AsyncNotifierProvider<PaletteNotifier, AppPalette> {
+  /// Jeu de couleurs courant, relu au démarrage puis maintenu en état.
+  ///
+  /// Un échec de lecture retombe sur [AppPalette.paper] : un réglage illisible ne
+  /// doit pas empêcher l'application de s'afficher.
+  PaletteNotifierProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'paletteProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$paletteNotifierHash();
+
+  @$internal
+  @override
+  PaletteNotifier create() => PaletteNotifier();
+}
+
+String _$paletteNotifierHash() => r'639ebb759901c5e2f150abe2f88cf88a87fe55aa';
+
+/// Jeu de couleurs courant, relu au démarrage puis maintenu en état.
+///
+/// Un échec de lecture retombe sur [AppPalette.paper] : un réglage illisible ne
+/// doit pas empêcher l'application de s'afficher.
+
+abstract class _$PaletteNotifier extends $AsyncNotifier<AppPalette> {
+  FutureOr<AppPalette> build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<AsyncValue<AppPalette>, AppPalette>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<AppPalette>, AppPalette>,
+              AsyncValue<AppPalette>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}

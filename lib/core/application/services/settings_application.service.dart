@@ -1,3 +1,4 @@
+import 'package:bible/core/domain/model/app_palette.dart';
 import 'package:bible/core/domain/model/app_theme_mode.dart';
 import 'package:bible/core/domain/services/dashboard_preferences.repository.dart';
 import 'package:bible/core/domain/services/theme.repository.dart';
@@ -19,6 +20,11 @@ class SettingsApplicationService {
 
   Future<void> setThemeMode(AppThemeMode mode) =>
       _themeRepository.setThemeMode(mode);
+
+  Future<AppPalette> getPalette() => _themeRepository.getPalette();
+
+  Future<void> setPalette(AppPalette palette) =>
+      _themeRepository.setPalette(palette);
 
   /// Bandeau de régularité déplié sur le tableau de bord. Replié par défaut.
   Future<bool> isStatsExpanded() => _dashboardPreferences.isStatsExpanded();

@@ -108,6 +108,7 @@ class _BibleAppState extends ConsumerState<BibleApp> with WidgetsBindingObserver
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
+    final palette = ref.watch(paletteProvider);
 
     // Un `401 invalid_token` sur une route protégée signifie que le jeton a été
     // révoqué ailleurs. L'intercepteur a déjà purgé le stockage local : on
@@ -120,8 +121,14 @@ class _BibleAppState extends ConsumerState<BibleApp> with WidgetsBindingObserver
     return MaterialApp(
       title: 'Bible',
       navigatorKey: navigatorKey,
-      theme: AppThemeData.buildLightTheme(),
-      darkTheme: AppThemeData.buildDarkTheme(),
+      // Les deux préférences sont indépendantes : la palette choisit les
+      // couleurs, le mode choisit laquelle de ses deux ambiances s'applique.
+      theme: AppThemeData.buildLightTheme(
+        palette.value ?? AppThemeData.defaultPalette,
+      ),
+      darkTheme: AppThemeData.buildDarkTheme(
+        palette.value ?? AppThemeData.defaultPalette,
+      ),
       // Le thème système s'applique tant que la préférence n'est pas lue : la
       // lecture est locale et brève, et un écran de chargement dédié pour ça
       // ferait clignoter le démarrage.

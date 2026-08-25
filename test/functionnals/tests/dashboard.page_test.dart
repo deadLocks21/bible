@@ -110,9 +110,9 @@ void main() {
       );
 
       expect(find.text('Plan chronologique'), findsOneWidget);
-      expect(find.text('Lecture du jour'), findsOneWidget);
+      expect(find.text('LECTURE DU JOUR'), findsOneWidget);
       expect(find.text('Genèse 1-3'), findsOneWidget);
-      expect(find.text('Prochaines lectures'), findsOneWidget);
+      expect(find.text('PROCHAINES LECTURES'), findsOneWidget);
       expect(find.text('Genèse 4-7'), findsOneWidget);
       expect(find.text('Genèse 8-11'), findsOneWidget);
     });
@@ -143,7 +143,7 @@ void main() {
       expect(app.reading.readEntries, ['entry-1']);
       expect(find.text('Genèse 1-3'), findsNothing);
       // La lecture suivante prend la place de la lecture du jour.
-      expect(find.text('Lecture du jour'), findsOneWidget);
+      expect(find.text('LECTURE DU JOUR'), findsOneWidget);
       expect(find.text('Genèse 4-7'), findsOneWidget);
     });
 

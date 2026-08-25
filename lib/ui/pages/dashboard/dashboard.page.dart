@@ -4,9 +4,11 @@ import 'package:bible/ui/pages/dashboard/providers/reading_board.provider.dart';
 import 'package:bible/ui/pages/dashboard/providers/reading_stats.provider.dart';
 import 'package:bible/ui/pages/dashboard/providers/stats_expanded.provider.dart';
 import 'package:bible/ui/pages/dashboard/widgets/stats_header.widget.dart';
-import 'package:bible/ui/pages/dashboard/widgets/passages_card.widget.dart';
+import 'package:bible/ui/pages/dashboard/widgets/today_card.widget.dart';
+import 'package:bible/ui/pages/dashboard/widgets/upcoming_row.widget.dart';
 import 'package:bible/ui/pages/history/history.page.dart';
 import 'package:bible/ui/pages/settings/settings.page.dart';
+import 'package:bible/ui/widgets/section_label.widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -153,13 +155,12 @@ class _Board extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final today = board.today;
-    final headline = Theme.of(context).textTheme.titleLarge;
 
     return ListView(
       // `always` : sans cela, une page trop courte pour défiler ne réagirait
       // pas au geste de rafraîchissement.
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: [
         const _StatsHeaderSlot(),
         if (today == null)
@@ -172,9 +173,9 @@ class _Board extends StatelessWidget {
             ),
           )
         else ...[
-          Text('Lecture du jour', style: headline),
+          const SectionLabel('Lecture du jour'),
           const SizedBox(height: 12),
-          PassagesCard(
+          TodayCard(
             entry: today,
             marking: markingEntryId == today.id,
             onMarkAsRead: markingEntryId == null
@@ -183,10 +184,11 @@ class _Board extends StatelessWidget {
           ),
         ],
         if (board.upcoming.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text('Prochaines lectures', style: headline),
-          const SizedBox(height: 12),
-          for (final entry in board.upcoming) PassagesCard(entry: entry),
+          const SizedBox(height: 32),
+          const SectionLabel('Prochaines lectures'),
+          const SizedBox(height: 4),
+          for (final (index, entry) in board.upcoming.indexed)
+            UpcomingRow(entry: entry, rank: index + 1),
         ],
       ],
     );

@@ -1,4 +1,5 @@
 import 'package:bible/core/application/services/settings_application.service.dart';
+import 'package:bible/core/domain/model/app_palette.dart';
 import 'package:bible/core/domain/model/app_theme_mode.dart';
 import 'package:bible/infrastructure/logger/providers/logger.service_provider.dart';
 import 'package:bible/infrastructure/settings/providers/dashboard_preferences.repository_provider.dart';
@@ -41,6 +42,37 @@ class ThemeModeNotifier extends _$ThemeModeNotifier {
       ref
           .read(loggerProvider)
           .error('settings.theme_mode.save_failed', error: e, stack: stack);
+      state = AsyncError(e, StackTrace.current);
+    }
+  }
+}
+
+/// Jeu de couleurs courant, relu au démarrage puis maintenu en état.
+///
+/// Un échec de lecture retombe sur [AppPalette.paper] : un réglage illisible ne
+/// doit pas empêcher l'application de s'afficher.
+@Riverpod(keepAlive: true)
+class PaletteNotifier extends _$PaletteNotifier {
+  @override
+  Future<AppPalette> build() async {
+    try {
+      return await ref.watch(settingsServiceProvider).getPalette();
+    } catch (e, stack) {
+      ref
+          .read(loggerProvider)
+          .warn('settings.palette.load_failed', error: e, stack: stack);
+      return AppPalette.paper;
+    }
+  }
+
+  Future<void> setPalette(AppPalette palette) async {
+    try {
+      await ref.read(settingsServiceProvider).setPalette(palette);
+      state = AsyncData(palette);
+    } catch (e, stack) {
+      ref
+          .read(loggerProvider)
+          .error('settings.palette.save_failed', error: e, stack: stack);
       state = AsyncError(e, StackTrace.current);
     }
   }

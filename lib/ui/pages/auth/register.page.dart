@@ -64,7 +64,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Créer un compte')),
+      appBar: AppBar(),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -76,6 +76,23 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Le titre vit dans la page, comme sur l'écran de
+                    // connexion : rien au-dessus, autant lui donner de l'air.
+                    Text(
+                      'Créer un compte',
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Quelques instants, et le plan est à vous.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
                     if (_error != null) ...[
                       ErrorBanner(
                         key: const Key('authErrorBanner'),

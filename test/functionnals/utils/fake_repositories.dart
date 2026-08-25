@@ -1,4 +1,5 @@
 import 'package:bible/core/domain/exceptions/auth.exception.dart';
+import 'package:bible/core/domain/model/app_palette.dart';
 import 'package:bible/core/domain/model/app_theme_mode.dart';
 import 'package:bible/core/domain/exceptions/profile.exception.dart';
 import 'package:bible/core/domain/exceptions/reading.exception.dart';
@@ -218,14 +219,24 @@ class FakeProfileRepository implements ProfileRepository {
 
 class FakeThemeRepository implements ThemeRepository {
   AppThemeMode mode;
+  AppPalette palette;
 
-  FakeThemeRepository({this.mode = AppThemeMode.system});
+  FakeThemeRepository({
+    this.mode = AppThemeMode.system,
+    this.palette = AppPalette.paper,
+  });
 
   @override
   Future<AppThemeMode> getThemeMode() async => mode;
 
   @override
   Future<void> setThemeMode(AppThemeMode value) async => mode = value;
+
+  @override
+  Future<AppPalette> getPalette() async => palette;
+
+  @override
+  Future<void> setPalette(AppPalette value) async => palette = value;
 }
 
 class FakeDashboardPreferencesRepository

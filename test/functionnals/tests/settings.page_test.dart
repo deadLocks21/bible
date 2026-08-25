@@ -1,4 +1,5 @@
 import 'package:bible/core/domain/exceptions/profile.exception.dart';
+import 'package:bible/core/domain/model/app_palette.dart';
 import 'package:bible/core/domain/model/app_theme_mode.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,6 +22,20 @@ Future<void> _openFromDashboard(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// La liste des réglages, et non la première venue : l'écran est empilé
+/// au-dessus du tableau de bord, dont la liste vient avant dans l'arbre.
+/// Reconstruit à chaque appel — un `Finder` mémorise ses résultats, et le
+/// partager entre deux tests le ferait pointer sur un arbre disparu.
+///
+/// `first` : les champs de saisie embarquent eux aussi un `Scrollable`, celui
+/// de la liste vient avant eux.
+Finder _settingsScrollable() => find
+    .descendant(
+      of: find.byKey(const Key('settingsList')),
+      matching: find.byType(Scrollable),
+    )
+    .first;
+
 /// Fait défiler jusqu'à la cible : connecté, l'écran empile assez de sections
 /// pour que les dernières sortent de la fenêtre de test — et la liste ne
 /// construit que ce qu'elle affiche.
@@ -29,7 +44,7 @@ Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
     await tester.scrollUntilVisible(
       finder,
       200,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: _settingsScrollable(),
     );
   } else {
     await tester.ensureVisible(finder);
@@ -44,7 +59,7 @@ Future<void> _tap(WidgetTester tester, Key key) async {
     await tester.scrollUntilVisible(
       finder,
       200,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: _settingsScrollable(),
     );
   } else {
     await tester.ensureVisible(finder);
@@ -70,7 +85,9 @@ void main() {
       await pumpApp(tester);
       await _openFromLogin(tester);
 
-      expect(find.text('Apparence'), findsOneWidget);
+      expect(find.text('JEU DE COULEURS'), findsOneWidget);
+      expect(find.text('APPARENCE'), findsOneWidget);
+      await _scrollTo(tester, find.byKey(const Key('appVersionTile')));
       expect(find.byKey(const Key('appVersionTile')), findsOneWidget);
       // Rien qui suppose un compte : ni formulaire, ni déconnexion.
       expect(find.byKey(const Key('profileNameField')), findsNothing);
@@ -87,10 +104,23 @@ void main() {
       expect(app.theme.mode, AppThemeMode.dark);
     });
 
+    testWidgets('enregistrent le jeu de couleurs choisi', (tester) async {
+      final app = await pumpApp(tester);
+      await _openFromLogin(tester);
+
+      await _tap(tester, const Key('palette_mono'));
+
+      expect(app.theme.palette, AppPalette.mono);
+      // La palette et l'ambiance sont deux réglages distincts : choisir l'une
+      // ne touche pas à l'autre.
+      expect(app.theme.mode, AppThemeMode.system);
+    });
+
     testWidgets('affichent la version installée', (tester) async {
       await pumpApp(tester);
       await _openFromLogin(tester);
 
+      await _scrollTo(tester, find.text('1.2.3 (45)'));
       expect(find.text('1.2.3 (45)'), findsOneWidget);
     });
 
@@ -109,14 +139,22 @@ void main() {
       );
       await _openFromDashboard(tester);
 
+      // La section du profil est passée sous la ligne de flottaison depuis que
+      // le jeu de couleurs occupe le haut de l'écran.
+      await tester.drag(
+        find.byKey(const Key('settingsList')),
+        const Offset(0, -400),
+      );
+      await tester.pumpAndSettle();
+
       expect(find.widgetWithText(TextFormField, 'Jean'), findsOneWidget);
       expect(
         find.widgetWithText(TextFormField, 'jean@example.com'),
         findsOneWidget,
       );
       // Les préférences restent accessibles depuis le même écran, plus bas.
-      await _scrollTo(tester, find.text('Apparence'));
-      expect(find.text('Apparence'), findsOneWidget);
+      await _scrollTo(tester, find.text('APPARENCE'));
+      expect(find.text('APPARENCE'), findsOneWidget);
     });
 
     testWidgets('enregistrent nom et e-mail', (tester) async {

@@ -2,8 +2,11 @@ import 'package:bible/core/application/dtos/reading_history.dto.dart';
 import 'package:bible/ui/widgets/french_date.dart';
 import 'package:flutter/material.dart';
 
-/// Ligne d'historique : les passages lus, la date de lecture, et — pour la
-/// seule lecture la plus récente — le bouton qui la repasse en non lue.
+/// Une lecture passée : les passages lus, la date, et — pour la seule lecture
+/// la plus récente — le bouton qui la repasse en non lue.
+///
+/// Pas de cadre : la liste se lit d'un trait, seule la lecture défaisable se
+/// détache, par son bouton.
 class HistoryEntryCard extends StatelessWidget {
   final ReadingHistoryEntryDto entry;
 
@@ -24,28 +27,30 @@ class HistoryEntryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          Icon(
+            Icons.check_circle_outline,
+            size: 20,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   entry.passages,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
-                  'Lu le ${formatDayAndTime(entry.readAt)}',
+                  formatDayAndTime(entry.readAt),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -57,18 +62,19 @@ class HistoryEntryCard extends StatelessWidget {
             const SizedBox(width: 12),
             if (undoing)
               const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
+                padding: EdgeInsets.symmetric(horizontal: 10),
                 child: SizedBox.square(
                   dimension: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               )
             else
-              OutlinedButton.icon(
+              IconButton(
                 key: const Key('markAsUnreadButton'),
                 onPressed: onUndo,
-                icon: const Icon(Icons.undo, size: 18),
-                label: const Text('Non lu'),
+                icon: const Icon(Icons.undo, size: 20),
+                tooltip: 'Repasser en non lu',
+                visualDensity: VisualDensity.compact,
               ),
           ],
         ],
