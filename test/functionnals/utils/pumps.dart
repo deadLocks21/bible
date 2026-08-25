@@ -4,6 +4,7 @@ import 'package:bible/infrastructure/auth/in_memory.auth_token_store.dart';
 import 'package:bible/infrastructure/auth/providers/auth.repository_provider.dart';
 import 'package:bible/infrastructure/auth/providers/auth_token_store.provider.dart';
 import 'package:bible/infrastructure/profile/providers/profile.repository_provider.dart';
+import 'package:bible/infrastructure/settings/providers/dashboard_preferences.repository_provider.dart';
 import 'package:bible/infrastructure/reading/providers/reading.repository_provider.dart';
 import 'package:bible/infrastructure/theme/providers/theme.repository_provider.dart';
 import 'package:bible/ui/pages/auth/auth_gate.dart';
@@ -21,6 +22,7 @@ class TestApp {
   final FakeReadingRepository reading;
   final FakeProfileRepository profile;
   final FakeThemeRepository theme;
+  final FakeDashboardPreferencesRepository dashboardPreferences;
   final AuthTokenStore tokenStore;
 
   const TestApp({
@@ -28,6 +30,7 @@ class TestApp {
     required this.reading,
     required this.profile,
     required this.theme,
+    required this.dashboardPreferences,
     required this.tokenStore,
   });
 }
@@ -44,12 +47,15 @@ Future<TestApp> pumpApp(
   FakeReadingRepository? reading,
   FakeProfileRepository? profile,
   FakeThemeRepository? theme,
+  FakeDashboardPreferencesRepository? dashboardPreferences,
 }) async {
   final app = TestApp(
     auth: auth ?? FakeAuthRepository(),
     reading: reading ?? FakeReadingRepository(),
     profile: profile ?? FakeProfileRepository(),
     theme: theme ?? FakeThemeRepository(),
+    dashboardPreferences:
+        dashboardPreferences ?? FakeDashboardPreferencesRepository(),
     tokenStore: InMemoryAuthTokenStore(session),
   );
 
@@ -60,6 +66,9 @@ Future<TestApp> pumpApp(
         readingRepositoryProvider.overrideWithValue(app.reading),
         profileRepositoryProvider.overrideWithValue(app.profile),
         themeRepositoryProvider.overrideWithValue(app.theme),
+        dashboardPreferencesRepositoryProvider.overrideWithValue(
+          app.dashboardPreferences,
+        ),
         authTokenStoreProvider.overrideWithValue(app.tokenStore),
       ],
       child: MaterialApp(

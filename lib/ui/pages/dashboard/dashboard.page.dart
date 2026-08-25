@@ -2,6 +2,7 @@ import 'package:bible/core/application/dtos/reading_board.dto.dart';
 import 'package:bible/core/domain/exceptions/reading.exception.dart';
 import 'package:bible/ui/pages/dashboard/providers/reading_board.provider.dart';
 import 'package:bible/ui/pages/dashboard/providers/reading_stats.provider.dart';
+import 'package:bible/ui/pages/dashboard/providers/stats_expanded.provider.dart';
 import 'package:bible/ui/pages/dashboard/widgets/stats_header.widget.dart';
 import 'package:bible/ui/pages/dashboard/widgets/passages_card.widget.dart';
 import 'package:bible/ui/pages/history/history.page.dart';
@@ -204,7 +205,11 @@ class _StatsHeaderSlot extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final stats = ref.watch(readingStatsProvider).value;
     if (stats == null || stats.isEmpty) return const SizedBox.shrink();
-    return StatsHeader(stats: stats);
+    return StatsHeader(
+      stats: stats,
+      expanded: ref.watch(statsExpandedProvider).value ?? false,
+      onToggle: ref.read(statsExpandedProvider.notifier).toggle,
+    );
   }
 }
 

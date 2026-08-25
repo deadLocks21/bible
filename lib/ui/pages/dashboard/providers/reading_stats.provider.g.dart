@@ -49,7 +49,7 @@ final class ReadingStatsNotifierProvider
 }
 
 String _$readingStatsNotifierHash() =>
-    r'681634e04d8aacadb1db306cb97aa5bbc0f0f23e';
+    r'7c641ecda528f99add447454b8440a2e36d28b84';
 
 /// Régularité et avancement de l'utilisateur.
 ///

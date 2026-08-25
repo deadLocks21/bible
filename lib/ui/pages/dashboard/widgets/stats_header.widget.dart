@@ -4,63 +4,129 @@ import 'package:flutter/material.dart';
 
 /// Bandeau de régularité en tête du tableau de bord : la série en cours, le
 /// record et l'avancement dans le plan.
+///
+/// Replié, il tient sur une ligne — la lecture du jour reste ce que l'écran
+/// montre en premier. Un appui le déplie, et le choix est retenu par
+/// l'appelant.
 class StatsHeader extends StatelessWidget {
   final ReadingStatsDto stats;
 
-  const StatsHeader({super.key, required this.stats});
+  final bool expanded;
+
+  final VoidCallback onToggle;
+
+  const StatsHeader({
+    super.key,
+    required this.stats,
+    required this.expanded,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      key: const Key('dashboardStats'),
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: theme.colorScheme.surfaceContainerHighest,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: const Key('dashboardStatsToggle'),
+        onTap: onToggle,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          // La taille s'anime : déplier ne doit pas faire sauter la lecture du
+          // jour d'un coup sous le doigt.
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            alignment: Alignment.topCenter,
+            child: expanded ? _Expanded(stats: stats) : _Collapsed(stats: stats),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Une ligne : l'essentiel de la régularité, et le chevron qui invite à ouvrir.
+class _Collapsed extends StatelessWidget {
+  final ReadingStatsDto stats;
+
+  const _Collapsed({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            '${_days(stats.currentStreak)} d\'affilée '
+            '· ${stats.progressPercent} % du plan',
+            key: const Key('dashboardStatsSummary'),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Icon(Icons.expand_more, color: theme.colorScheme.onSurfaceVariant),
+      ],
+    );
+  }
+}
+
+/// Le bandeau complet.
+class _Expanded extends StatelessWidget {
+  final ReadingStatsDto stats;
+
+  const _Expanded({required this.stats});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final firstReadAt = stats.firstReadAt;
 
-    return Container(
-      key: const Key('dashboardStats'),
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: theme.colorScheme.surfaceContainerHighest,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _Figure(
-                  key: const Key('dashboardCurrentStreak'),
-                  value: _days(stats.currentStreak),
-                  label: 'Série en cours',
-                ),
-              ),
-              Expanded(
-                child: _Figure(
-                  value: _days(stats.longestStreak),
-                  label: 'Record',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _Progress(stats: stats),
-          if (firstReadAt != null) ...[
-            const SizedBox(height: 16),
-            Text(
-              'Depuis le ${formatDay(firstReadAt)}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _Figure(
+                key: const Key('dashboardCurrentStreak'),
+                value: _days(stats.currentStreak),
+                label: 'Série en cours',
               ),
             ),
+            Expanded(
+              child: _Figure(value: _days(stats.longestStreak), label: 'Record'),
+            ),
+            Icon(Icons.expand_less, color: theme.colorScheme.onSurfaceVariant),
           ],
+        ),
+        const SizedBox(height: 16),
+        _Progress(stats: stats),
+        if (firstReadAt != null) ...[
+          const SizedBox(height: 16),
+          Text(
+            'Depuis le ${formatDay(firstReadAt)}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
-
-  /// « 1 jour », « 5 jours » — l'unité fait toute la lisibilité du chiffre.
-  String _days(int count) => count > 1 ? '$count jours' : '$count jour';
 }
+
+/// « 1 jour », « 5 jours » — l'unité fait toute la lisibilité du chiffre.
+String _days(int count) => count > 1 ? '$count jours' : '$count jour';
 
 /// Intitulé d'une mesure, en capitales espacées — faute de vraies petites
 /// capitales, que la police système ne garantit pas. Le rôle est d'étiqueter

@@ -13,7 +13,9 @@ import 'package:bible/core/domain/model/reading_entry.dart';
 import 'package:bible/core/domain/model/reading_history.dart';
 import 'package:bible/core/domain/model/reading_plan.dart';
 import 'package:bible/core/domain/model/reading_stats.dart';
+import 'package:bible/core/domain/services/dashboard_preferences.repository.dart';
 import 'package:bible/core/domain/services/reading.repository.dart';
+import 'package:bible/infrastructure/settings/providers/dashboard_preferences.repository_provider.dart';
 import 'package:bible/infrastructure/reading/providers/reading.repository_provider.dart';
 import 'package:bible/ui/pages/dashboard/dashboard.page.dart';
 import 'package:bible/ui/theme/app_theme_data.dart';
@@ -25,6 +27,9 @@ void main() {
     ProviderScope(
       overrides: [
         readingRepositoryProvider.overrideWithValue(PreviewReadingRepository()),
+        dashboardPreferencesRepositoryProvider.overrideWithValue(
+          PreviewDashboardPreferencesRepository(),
+        ),
       ],
       child: MaterialApp(
         title: 'Bible — aperçu',
@@ -34,6 +39,20 @@ void main() {
       ),
     ),
   );
+}
+
+/// Préférences d'affichage en mémoire : le bandeau s'ouvre et se referme le
+/// temps de l'aperçu, sans toucher au stockage de la machine.
+class PreviewDashboardPreferencesRepository
+    implements DashboardPreferencesRepository {
+  bool _statsExpanded = false;
+
+  @override
+  Future<bool> isStatsExpanded() async => _statsExpanded;
+
+  @override
+  Future<void> setStatsExpanded(bool expanded) async =>
+      _statsExpanded = expanded;
 }
 
 /// Un plan en cours de lecture : 84 lectures derrière, 281 devant.

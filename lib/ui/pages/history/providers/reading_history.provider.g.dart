@@ -50,7 +50,7 @@ final class ReadingHistoryNotifierProvider
 }
 
 String _$readingHistoryNotifierHash() =>
-    r'86201b6183c987cc9e1f1c154d2b7c54ebe6cfe1';
+    r'1c7290a8b39c7cceb13b3974149b980d18a28f35';
 
 /// Charge l'historique page par page et l'accumule.
 ///

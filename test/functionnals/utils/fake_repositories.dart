@@ -9,6 +9,7 @@ import 'package:bible/core/domain/model/reading_history.dart';
 import 'package:bible/core/domain/model/reading_stats.dart';
 import 'package:bible/core/domain/model/user.dart';
 import 'package:bible/core/domain/services/auth.repository.dart';
+import 'package:bible/core/domain/services/dashboard_preferences.repository.dart';
 import 'package:bible/core/domain/services/profile.repository.dart';
 import 'package:bible/core/domain/services/reading.repository.dart';
 import 'package:bible/core/domain/services/theme.repository.dart';
@@ -225,4 +226,18 @@ class FakeThemeRepository implements ThemeRepository {
 
   @override
   Future<void> setThemeMode(AppThemeMode value) async => mode = value;
+}
+
+class FakeDashboardPreferencesRepository
+    implements DashboardPreferencesRepository {
+  bool statsExpanded;
+
+  FakeDashboardPreferencesRepository({this.statsExpanded = false});
+
+  @override
+  Future<bool> isStatsExpanded() async => statsExpanded;
+
+  @override
+  Future<void> setStatsExpanded(bool expanded) async =>
+      statsExpanded = expanded;
 }

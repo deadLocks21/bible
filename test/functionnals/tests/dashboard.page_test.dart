@@ -25,12 +25,61 @@ void main() {
         ),
       );
 
+      // Replié par défaut : une ligne, pas le bandeau complet.
       expect(find.byKey(const Key('dashboardStats')), findsOneWidget);
-      expect(find.text('5 jours'), findsOneWidget);
+      expect(find.text('5 jours d\'affilée · 23 % du plan'), findsOneWidget);
+      expect(find.text('SÉRIE EN COURS'), findsNothing);
+    });
+
+    testWidgets('déplie la régularité et retient le choix', (tester) async {
+      final app = await pumpApp(
+        tester,
+        session: anAuthSession(),
+        reading: FakeReadingRepository(
+          board: aReadingBoard(),
+          history: [aReadingHistoryEntry(passages: 'Introduction')],
+          stats: const ReadingStats(
+            currentStreak: 5,
+            longestStreak: 12,
+            readCount: 84,
+            planEntryCount: 365,
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('dashboardStatsToggle')));
+      await tester.pumpAndSettle();
+
       expect(find.text('SÉRIE EN COURS'), findsOneWidget);
+      expect(find.text('5 jours'), findsOneWidget);
       expect(find.text('12 jours'), findsOneWidget);
       expect(find.text('AVANCEMENT'), findsOneWidget);
       expect(find.text('84 lectures sur 365 — 23 %'), findsOneWidget);
+      expect(app.dashboardPreferences.statsExpanded, isTrue);
+    });
+
+    testWidgets('rouvre déplié quand l\'utilisateur l\'avait laissé ainsi', (
+      tester,
+    ) async {
+      await pumpApp(
+        tester,
+        session: anAuthSession(),
+        reading: FakeReadingRepository(
+          board: aReadingBoard(),
+          history: [aReadingHistoryEntry(passages: 'Introduction')],
+          stats: const ReadingStats(
+            currentStreak: 5,
+            longestStreak: 12,
+            readCount: 84,
+            planEntryCount: 365,
+          ),
+        ),
+        dashboardPreferences: FakeDashboardPreferencesRepository(
+          statsExpanded: true,
+        ),
+      );
+
+      expect(find.text('SÉRIE EN COURS'), findsOneWidget);
     });
 
     testWidgets('masque le bandeau tant que rien n\'a été lu', (tester) async {
