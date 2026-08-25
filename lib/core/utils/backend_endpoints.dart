@@ -34,6 +34,9 @@ class BackendEndpoints {
   /// Lectures déjà validées, par pages.
   static const String readingHistory = '/api/reading-plan/history';
 
+  /// Régularité et avancement sur le plan actif.
+  static const String readingStats = '/api/reading-plan/stats';
+
   /// Préfixe des routes publiques : l'intercepteur d'authentification n'y
   /// ajoute pas de jeton et n'y interprète pas les 401.
   static const String publicPrefix = '/api/auth/';

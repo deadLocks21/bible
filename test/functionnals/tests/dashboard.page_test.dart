@@ -1,4 +1,5 @@
 import 'package:bible/core/domain/exceptions/reading.exception.dart';
+import 'package:bible/core/domain/model/reading_stats.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -8,6 +9,40 @@ import '../utils/pumps.dart';
 
 void main() {
   group('Tableau de bord', () {
+    testWidgets('affiche la régularité en tête', (tester) async {
+      await pumpApp(
+        tester,
+        session: anAuthSession(),
+        reading: FakeReadingRepository(
+          board: aReadingBoard(),
+          history: [aReadingHistoryEntry(passages: 'Introduction')],
+          stats: const ReadingStats(
+            currentStreak: 5,
+            longestStreak: 12,
+            readCount: 84,
+            planEntryCount: 365,
+          ),
+        ),
+      );
+
+      expect(find.byKey(const Key('dashboardStats')), findsOneWidget);
+      expect(find.text('5 jours'), findsOneWidget);
+      expect(find.text('SÉRIE EN COURS'), findsOneWidget);
+      expect(find.text('12 jours'), findsOneWidget);
+      expect(find.text('AVANCEMENT'), findsOneWidget);
+      expect(find.text('84 lectures sur 365 — 23 %'), findsOneWidget);
+    });
+
+    testWidgets('masque le bandeau tant que rien n\'a été lu', (tester) async {
+      await pumpApp(
+        tester,
+        session: anAuthSession(),
+        reading: FakeReadingRepository(board: aReadingBoard()),
+      );
+
+      expect(find.byKey(const Key('dashboardStats')), findsNothing);
+    });
+
     testWidgets('affiche le plan, la lecture du jour et les suivantes', (
       tester,
     ) async {

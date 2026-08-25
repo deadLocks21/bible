@@ -1,4 +1,5 @@
 import 'package:bible/core/application/dtos/reading_history.dto.dart';
+import 'package:bible/ui/widgets/french_date.dart';
 import 'package:flutter/material.dart';
 
 /// Ligne d'historique : les passages lus, la date de lecture, et — pour la
@@ -44,7 +45,7 @@ class HistoryEntryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Lu le ${formatReadAt(entry.readAt)}',
+                  'Lu le ${formatDayAndTime(entry.readAt)}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -74,20 +75,4 @@ class HistoryEntryCard extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Date de lecture en français, ex. « 24 août 2026 à 09:12 ».
-///
-/// Écrite à la main : l'application n'embarque pas `intl`, et un seul format
-/// suffit ici.
-String formatReadAt(DateTime date) {
-  const months = [
-    'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
-  ];
-  final local = date.toLocal();
-  final hour = local.hour.toString().padLeft(2, '0');
-  final minute = local.minute.toString().padLeft(2, '0');
-  return '${local.day} ${months[local.month - 1]} ${local.year} '
-      'à $hour:$minute';
 }

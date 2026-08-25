@@ -42,6 +42,14 @@ const _historyPayload = {
   'has_more': true,
 };
 
+const _statsPayload = {
+  'current_streak': 5,
+  'longest_streak': 12,
+  'read_count': 84,
+  'plan_entry_count': 365,
+  'first_read_at': '2026-05-01T07:12:00+00:00',
+};
+
 void main() {
   group('DioReadingRepository', () {
     test('décode le plan, les lectures et leurs vidéos', () async {
@@ -139,6 +147,47 @@ void main() {
       );
       expect(history.entries.last.canUnread, isFalse);
       expect(history.hasMore, isTrue);
+    });
+
+    test('décode les statistiques de lecture', () async {
+      final recorded = <RecordedRequest>[];
+      final repository = DioReadingRepository(
+        stubDio(
+          recorded: recorded,
+          handler: (_) => const StubResponse(200, _statsPayload),
+        ),
+      );
+
+      final stats = await repository.loadStats();
+
+      expect(recorded.single.path, '/api/reading-plan/stats');
+      expect(stats.currentStreak, 5);
+      expect(stats.longestStreak, 12);
+      expect(stats.readCount, 84);
+      expect(stats.planEntryCount, 365);
+      expect(stats.firstReadAt?.toUtc(), DateTime.utc(2026, 5, 1, 7, 12));
+      expect(stats.progress, closeTo(84 / 365, 0.0001));
+    });
+
+    test('accepte des statistiques sans première lecture', () async {
+      final repository = DioReadingRepository(
+        stubDio(
+          handler: (_) => const StubResponse(200, {
+            'current_streak': 0,
+            'longest_streak': 0,
+            'read_count': 0,
+            'plan_entry_count': 0,
+            'first_read_at': null,
+          }),
+        ),
+      );
+
+      final stats = await repository.loadStats();
+
+      expect(stats.firstReadAt, isNull);
+      expect(stats.isEmpty, isTrue);
+      // Pas de dénominateur : la progression vaut zéro plutôt que `NaN`.
+      expect(stats.progress, 0);
     });
 
     test('signale l\'absence de plan actif par une exception dédiée', () async {

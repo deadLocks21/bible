@@ -1,10 +1,11 @@
 import 'package:bible/core/domain/model/reading_board.dart';
 import 'package:bible/core/domain/model/reading_history.dart';
+import 'package:bible/core/domain/model/reading_stats.dart';
 
 /// Contrat d'accès au plan de lecture actif, calqué sur l'API
 /// (`GET /api/reading-plan`, `POST /api/reading-plan/entries/{id}/read`,
 /// `DELETE /api/reading-plan/entries/{id}/read`,
-/// `GET /api/reading-plan/history`).
+/// `GET /api/reading-plan/history`, `GET /api/reading-plan/stats`).
 ///
 /// Lève une `NoActivePlanException` quand aucun plan n'est assigné, une
 /// `ReadingException` pour les autres échecs.
@@ -25,4 +26,7 @@ abstract interface class ReadingRepository {
   /// Lectures déjà validées, de la plus récente à la plus ancienne, par pages
   /// numérotées à partir de 1.
   Future<ReadingHistory> loadHistory({int page});
+
+  /// Régularité et avancement sur le plan actif.
+  Future<ReadingStats> loadStats();
 }

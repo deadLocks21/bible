@@ -1,6 +1,7 @@
 import 'package:bible/core/application/services/reading_application.service.dart';
 import 'package:bible/core/application/usecases/load_reading_board.usecase.dart';
 import 'package:bible/core/application/usecases/load_reading_history.usecase.dart';
+import 'package:bible/core/application/usecases/load_reading_stats.usecase.dart';
 import 'package:bible/core/application/usecases/mark_entry_as_read.usecase.dart';
 import 'package:bible/core/application/usecases/mark_entry_as_unread.usecase.dart';
 import 'package:bible/infrastructure/logger/providers/logger.service_provider.dart';
@@ -18,5 +19,6 @@ ReadingApplicationService readingService(Ref ref) {
     markEntryAsRead: MarkEntryAsReadUseCase(reading, logger),
     markEntryAsUnread: MarkEntryAsUnreadUseCase(reading, logger),
     loadHistory: LoadReadingHistoryUseCase(reading, logger),
+    loadStats: LoadReadingStatsUseCase(reading, logger),
   );
 }

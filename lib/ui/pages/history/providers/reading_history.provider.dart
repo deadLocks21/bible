@@ -71,6 +71,8 @@ class ReadingHistoryNotifier extends _$ReadingHistoryNotifier {
 
   Future<String?> _load(int page, {required bool append}) async {
     final result = await _execute(page);
+    // L'écran a pu être quitté pendant l'appel : plus d'état où se poser.
+    if (!ref.mounted) return null;
     switch (result) {
       case ReadingHistoryLoaded(:final history):
         final previous = append ? state.value : null;

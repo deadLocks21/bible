@@ -3,6 +3,7 @@ import 'package:bible/core/domain/model/bible_chapter_video.dart';
 import 'package:bible/core/domain/model/reading_board.dart';
 import 'package:bible/core/domain/model/reading_entry.dart';
 import 'package:bible/core/domain/model/reading_history.dart';
+import 'package:bible/core/domain/model/reading_stats.dart';
 import 'package:bible/core/domain/model/reading_plan.dart';
 import 'package:bible/core/domain/services/reading.repository.dart';
 import 'package:bible/core/utils/backend_endpoints.dart';
@@ -68,6 +69,35 @@ class DioReadingRepository implements ReadingRepository {
       throw _exceptionFrom(e, _loadMessages);
     }
   }
+
+  @override
+  Future<ReadingStats> loadStats() async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        BackendEndpoints.readingStats,
+      );
+      return _statsFrom(response.data);
+    } on DioException catch (e) {
+      throw _exceptionFrom(e, _loadMessages);
+    }
+  }
+
+  ReadingStats _statsFrom(Map<String, dynamic>? data) {
+    if (data == null) {
+      throw const ReadingException('Réponse du serveur invalide.');
+    }
+    final firstReadAt = DateTime.tryParse('${data['first_read_at']}');
+    return ReadingStats(
+      currentStreak: _intFrom(data['current_streak']),
+      longestStreak: _intFrom(data['longest_streak']),
+      readCount: _intFrom(data['read_count']),
+      planEntryCount: _intFrom(data['plan_entry_count']),
+      firstReadAt: firstReadAt?.toLocal(),
+    );
+  }
+
+  int _intFrom(Object? value) =>
+      value is int ? value : int.tryParse('$value') ?? 0;
 
   ReadingHistory _historyFrom(Map<String, dynamic>? data, int requestedPage) {
     final entries = data?['entries'];

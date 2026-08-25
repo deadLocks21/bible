@@ -6,6 +6,7 @@ import 'package:bible/core/domain/model/auth_session.dart';
 import 'package:bible/core/domain/model/reading_board.dart';
 import 'package:bible/core/domain/model/reading_entry.dart';
 import 'package:bible/core/domain/model/reading_history.dart';
+import 'package:bible/core/domain/model/reading_stats.dart';
 import 'package:bible/core/domain/model/user.dart';
 import 'package:bible/core/domain/services/auth.repository.dart';
 import 'package:bible/core/domain/services/profile.repository.dart';
@@ -74,6 +75,10 @@ class FakeReadingRepository implements ReadingRepository {
   /// sert l'API.
   final List<ReadingHistoryEntry> history;
 
+  /// Statistiques renvoyées par [loadStats]. Quand elles sont `null`, elles
+  /// sont déduites de l'historique et du plan, comme le ferait le serveur.
+  ReadingStats? stats;
+
   /// Taille d'une page d'historique, calquée sur celle du serveur.
   static const int historyPageSize = 20;
 
@@ -83,6 +88,7 @@ class FakeReadingRepository implements ReadingRepository {
       'Aucun plan de lecture ne vous est encore assigné.',
     ),
     List<ReadingHistoryEntry>? history,
+    this.stats,
   }) : history = [...?history];
 
   @override
@@ -135,6 +141,20 @@ class FakeReadingRepository implements ReadingRepository {
       ],
     );
     return board!;
+  }
+
+  @override
+  Future<ReadingStats> loadStats() async {
+    final current = board;
+    if (current == null) throw failure;
+    return stats ??
+        ReadingStats(
+          currentStreak: history.isEmpty ? 0 : 1,
+          longestStreak: history.isEmpty ? 0 : 1,
+          readCount: history.length,
+          planEntryCount: history.length + current.entries.length,
+          firstReadAt: history.isEmpty ? null : history.last.readAt,
+        );
   }
 
   @override

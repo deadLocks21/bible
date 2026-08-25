@@ -1,6 +1,7 @@
 import 'package:bible/core/domain/exceptions/reading.exception.dart';
 import 'package:bible/ui/pages/dashboard/providers/reading_board.provider.dart';
 import 'package:bible/ui/pages/history/providers/reading_history.provider.dart';
+import 'package:bible/ui/pages/dashboard/providers/reading_stats.provider.dart';
 import 'package:bible/ui/pages/history/widgets/history_entry_card.widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -80,6 +81,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
         .markAsUnread(entryId);
     if (mounted && error == null) {
       await ref.read(readingHistoryProvider.notifier).refresh();
+      await ref.read(readingStatsProvider.notifier).refresh();
     }
     if (!mounted) return;
     setState(() => _undoingEntryId = null);
@@ -150,6 +152,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
       },
     ),
   };
+
 }
 
 /// Message centré occupant la page, pour les états « aucun plan », « aucune

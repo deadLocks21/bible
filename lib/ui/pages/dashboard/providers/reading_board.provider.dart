@@ -43,6 +43,7 @@ class ReadingBoardNotifier extends _$ReadingBoardNotifier {
   /// raté ne doit pas remplacer les lectures par une page d'erreur.
   Future<String?> refresh() async {
     final result = await ref.read(readingServiceProvider).loadBoard.execute();
+    if (!ref.mounted) return null;
     switch (result) {
       case ReadingBoardLoaded(:final board):
         state = AsyncData(ReadingBoardAvailable(board));
