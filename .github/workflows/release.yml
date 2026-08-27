@@ -15,7 +15,8 @@
 #   1) prepare        Calcule la version (depuis le tag ou pubspec.yaml).
 #
 #   2) Builds parallèle (gate strict) :
-#        build-android      → APK universel signé (sideload, attaché) + mapping.txt
+#        build-android      → APK universel signé (sideload, attaché)
+#                             + mapping.txt R8 (artifact du run seulement)
 #        build-macos        → .app Developer ID notarisé (hors App Store)
 #        build-updater      → « Bible Installer.app » notarisé (tool/updater)
 #      Si UN SEUL plante, la Release n'est pas créée.
@@ -25,8 +26,9 @@
 #
 #   4) release        Crée la GitHub Release dès le gate franchi.
 #                     Assets attachés : app macOS, installateur macOS, APK
-#                     universel et mapping.txt — cf. le contrat de nommage des
-#                     assets documenté dans le job.
+#                     universel — cf. le contrat de nommage des assets
+#                     documenté dans le job. PAS le mapping.txt R8, qui
+#                     reste dans l'artifact du run (cf. job build-android).
 #                     Notes = changelog semantic-release relu depuis le corps
 #                     du commit `chore(release)` taggé.
 #
@@ -50,9 +52,10 @@ concurrency:
   cancel-in-progress: true
 
 # Configuration Signoz partagée entre toutes les plateformes. Injectée dans
-# chaque binaire via `--dart-define` à la compilation. L'app ne les lit pas
-# encore (pas de LoggerService Signoz côté bible) : les blocs sont en place
-# pour le jour où on branche la télémétrie, à l'identique de kidflix.
+# chaque binaire via `--dart-define` à la compilation, et lue par
+# `lib/infrastructure/logger/providers/logger.service_provider.dart`. Un
+# `SIGNOZ_INGEST_URL` vide désactive silencieusement l'export : l'application
+# se replie sur sa console, elle ne tombe pas.
 #
 # `SIGNOZ_INGEST_URL` vient du secret du même nom (instance self-hosted →
 # l'URL n'est pas codée en dur ici). Il est mappé dans le bloc `env:` de
@@ -655,11 +658,16 @@ jobs:
           # Piège : ne jamais renommer l'installateur macOS en
           # `bible-macos-installer-*` (il matcherait la regex de l'app).
           #
-          # `mapping.txt` EST attaché volontairement : R8 est actif (le plugin
-          # Gradle de Flutter l'active par défaut en release), et cette table de
-          # désobfuscation est le seul moyen de relire les stack traces des
-          # crashs de la version publiée. C'est le seul asset non installable
-          # qu'on garde — il ne pèse rien à côté des binaires.
+          # `mapping.txt` n'est délibérément PAS attaché. R8 est actif (le
+          # plugin Gradle de Flutter l'active par défaut en release) et cette
+          # table de désobfuscation sert à relire les stack traces de la
+          # version publiée — mais publiée ici, elle permet à n'importe qui de
+          # dés-obfusquer l'APK, ce qui annule le bénéfice de R8. Elle ne
+          # couvre par ailleurs que la couche Java/Kotlin : le code Dart n'est
+          # pas obfusqué (pas de `--obfuscate`), donc l'essentiel des crashes
+          # d'une app Flutter ne passe pas par elle.
+          # Elle reste disponible 14 jours en accès restreint dans l'artifact
+          # `bible-android` du run Actions (cf. job build-android).
           #
           # On n'attache par ailleurs que les assets réellement présents :
           # certaines plateformes peuvent être désactivées, et passer un
@@ -672,7 +680,6 @@ jobs:
             ASSETS+=("$f")
           done < <(find artifacts -type f \
             \( -name '*.apk' \
-               -o -name 'mapping.txt' \
                -o -name '*.zip' \) | sort)
 
           if [ ${#ASSETS[@]} -eq 0 ]; then
