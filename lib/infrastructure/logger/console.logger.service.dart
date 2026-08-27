@@ -13,7 +13,13 @@ import 'package:flutter/foundation.dart';
 /// Une ligne par enregistrement : `NIVEAU message clé=valeur …`, suivie de la
 /// pile d'appels quand il y en a une. Sans tampon : `flush()` ne fait rien.
 class ConsoleLoggerService implements LoggerService {
-  const ConsoleLoggerService();
+  /// Marqueur ajouté en tête de ligne. Sert à distinguer, quand ce service est
+  /// enveloppé dans un `CompositeLoggerService`, les enregistrements qui
+  /// partent *aussi* vers Signoz (`[→signoz]`) : la console devient alors la
+  /// lecture fidèle de ce qui est expédié.
+  final String? prefix;
+
+  const ConsoleLoggerService({this.prefix});
 
   @override
   Future<void> log(
@@ -24,6 +30,7 @@ class ConsoleLoggerService implements LoggerService {
     StackTrace? stack,
   }) async {
     final buffer = StringBuffer();
+    if (prefix != null) buffer.write('$prefix ');
     // Le niveau fait partie du texte : [debugPrint] n'a pas de paramètre de
     // sévérité.
     buffer.write('${level.otelSeverityText} ');

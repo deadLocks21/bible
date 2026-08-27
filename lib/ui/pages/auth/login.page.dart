@@ -1,3 +1,4 @@
+import 'package:bible/ui/observability/logging.navigator_observer.dart';
 import 'package:bible/ui/pages/auth/providers/auth_state.provider.dart';
 import 'package:bible/ui/pages/auth/register.page.dart';
 import 'package:bible/ui/pages/settings/settings.page.dart';
@@ -60,7 +61,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Réglages',
             onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const SettingsPage()),
+              MaterialPageRoute<void>(
+                settings: AppRoutes.of(AppRoutes.settings),
+                builder: (_) => const SettingsPage(),
+              ),
             ),
           ),
         ],
@@ -162,6 +166,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               ? null
                               : () => Navigator.of(context).push(
                                   MaterialPageRoute<void>(
+                                    settings: AppRoutes.of(
+                                      AppRoutes.register,
+                                    ),
                                     builder: (_) => const RegisterPage(),
                                   ),
                                 ),

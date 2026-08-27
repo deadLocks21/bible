@@ -1,6 +1,7 @@
 import 'package:bible/infrastructure/auth/providers/auth_token_store.provider.dart';
 import 'package:bible/infrastructure/auth/providers/session_revocation.provider.dart';
 import 'package:bible/infrastructure/http/auth.interceptor.dart';
+import 'package:bible/infrastructure/http/logging.interceptor.dart';
 import 'package:bible/infrastructure/http/providers/api_base_url.provider.dart';
 import 'package:bible/infrastructure/logger/providers/logger.service_provider.dart';
 import 'package:dio/dio.dart';
@@ -34,6 +35,12 @@ Dio dio(Ref ref) {
       headers: {'Accept': 'application/json'},
     ),
   );
+
+  // La journalisation est ajoutée en premier : Dio exécute les intercepteurs
+  // dans l'ordre d'ajout, le chronomètre démarre donc avant la lecture du
+  // jeton en stockage — laquelle fait bel et bien partie du temps que
+  // l'utilisateur attend.
+  dio.interceptors.add(LoggingInterceptor(ref.watch(loggerProvider)));
 
   dio.interceptors.add(
     AuthInterceptor(

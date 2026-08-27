@@ -434,3 +434,56 @@ Le lecteur YouTube s'appuie sur une WebView, indisponible en test : les tests fo
 - **Serveur** : `../api`, une application Laravel qui sert à la fois le site (Inertia + session) et l'API JSON consommée ici (jeton Sanctum). Le contrat est décrit dans `../api/API.md` ; il fait foi.
 - **Erreurs** : l'API répond `{ "error", "code" }`. Les repositories se calent sur `code` — jamais sur `error` — et traduisent en exception de domaine porteuse d'un message prêt à afficher. `ApiError` (`infrastructure/http/`) centralise cette lecture.
 - **Session** : le jeton Sanctum n'expire pas. Un `401 invalid_token` est donc le seul signal de révocation ; `AuthInterceptor` purge le stockage local et prévient l'UI via `sessionRevocationProvider`.
+
+---
+
+## 🔭 Journalisation
+
+La journalisation suit la même hexagonale que le reste : un port dans le domaine,
+des adaptateurs dans l'infrastructure, une façade dans l'application.
+
+```
+core/domain/services/logger.service.dart          # le port : log() + flush()
+core/domain/model/log_level.dart                  # debug / info / warn / error
+core/application/services/logger_application.service.dart  # la façade et le contexte
+infrastructure/logger/console.logger.service.dart # écrit dans la console
+infrastructure/logger/signoz.logger.service.dart  # expédie en OTLP/HTTP
+infrastructure/logger/composite.logger.service.dart # diffuse aux deux
+infrastructure/logger/in_memory.logger.service.dart # pour les tests
+infrastructure/logger/logging.provider_observer.dart # erreurs des providers
+infrastructure/logger/providers/                  # assemble selon les --dart-define
+```
+
+Le choix de l'adaptateur est **entièrement** dans
+`logger.service_provider.dart` : ni le domaine, ni l'application, ni l'UI ne
+savent que Signoz existe. Brancher un autre collecteur demain ne touche que ce
+fichier et un adaptateur de plus.
+
+### Où journaliser
+
+| Couche             | Quoi                                                                 |
+|--------------------|----------------------------------------------------------------------|
+| **Application**    | Le résultat d'un cas d'usage : ce qui a réussi, ce qui a échoué, et pourquoi. C'est la couche qui *sait* ce que l'utilisateur essayait de faire. |
+| **Infrastructure** | Les défaillances techniques que la couche au-dessus ne voit pas : appel HTTP, stockage illisible, vue web en échec. |
+| **UI**             | Le parcours — écrans traversés, cycle de vie — via `LoggingNavigatorObserver` et `main.dart`. Jamais une règle métier. |
+| **Filets**         | `main.dart` branche `FlutterError.onError` et `PlatformDispatcher.onError` ; le `ProviderContainer` reçoit `LoggingProviderObserver`. Les trois ensemble couvrent tout ce que le code applicatif n'a pas rattrapé. |
+| **Domain**         | Jamais. Le domaine n'a pas de dépendance, journalisation comprise.    |
+
+### Conventions
+
+- **Le message est un identifiant, pas une phrase** : `reading.load_failed`,
+  jamais « Impossible de charger le plan de Jean à 10h42 ». Il doit rester stable
+  pour qu'on puisse compter ses occurrences ; les données variables vont dans les
+  attributs.
+- **`domaine.action[_résultat]`**, en minuscules avec points : `auth.signed_in`,
+  `player.failed`, `http.call`.
+- **Les attributs suivent la convention OpenTelemetry** quand elle existe
+  (`http.status`, `exception.type`, `service.name`), sinon `domaine.clé`.
+- **Les niveaux** : `error` pour ce qui casse et qu'on n'a pas prévu, `warn` pour
+  ce qui a échoué mais reste géré (4xx, réglage illisible), `info` pour le
+  parcours nominal, `debug` pour le détail technique (appels HTTP aboutis).
+- **Rien de sensible** : ni mot de passe, ni jeton, ni corps de requête, ni
+  e-mail. `user.id` suffit à retrouver un compte côté API.
+
+Les événements produits et la configuration d'export sont listés dans
+[README.md](README.md#observabilité).

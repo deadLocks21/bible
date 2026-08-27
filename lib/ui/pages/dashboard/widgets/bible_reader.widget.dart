@@ -1,8 +1,11 @@
 import 'dart:convert';
 
 import 'package:bible/core/application/dtos/chapter_video.dto.dart';
+import 'package:bible/core/application/services/logger_application.service.dart';
+import 'package:bible/infrastructure/logger/providers/logger.service_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Lecteur des vidéos-chapitres d'une lecture.
 ///
@@ -20,21 +23,31 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 /// les options du lecteur YouTube — vitesse, qualité, sous-titres, chapitrage —
 /// et surtout le plein écran, y compris sur macOS, où WebKit s'en charge de
 /// lui-même dès lors que l'élément a le droit de le demander.
-class BibleReader extends StatefulWidget {
+class BibleReader extends ConsumerStatefulWidget {
   final List<ChapterVideoDto> videos;
 
   const BibleReader({super.key, required this.videos});
 
   @override
-  State<BibleReader> createState() => _BibleReaderState();
+  ConsumerState<BibleReader> createState() => _BibleReaderState();
 }
 
-class _BibleReaderState extends State<BibleReader> {
+class _BibleReaderState extends ConsumerState<BibleReader> {
   /// Largeur maximale du lecteur. Au-delà, la vidéo écraserait la page sans
   /// se regarder mieux ; en deçà — un téléphone — la contrainte ne mord pas.
   static const double _maxPlayerWidth = 640;
 
+  /// Nombre d'erreurs de console remontées par lecteur.
+  ///
+  /// La page hôte tient dans quarante lignes, mais l'iframe YouTube qu'elle
+  /// charge en produit à elle seule un flot continu. Les premières suffisent à
+  /// comprendre pourquoi une lecture ne démarre pas ; les suivantes ne feraient
+  /// que noyer le reste des logs.
+  static const int _maxConsoleErrors = 3;
+
   InAppWebViewController? _controller;
+  int _consoleErrors = 0;
+  late final LoggerApplicationService _logger;
   late final List<String> _ids;
   int _index = 0;
 
@@ -42,6 +55,13 @@ class _BibleReaderState extends State<BibleReader> {
   void initState() {
     super.initState();
     _ids = widget.videos.map((video) => video.youtubeVideoId).toList();
+    // Le lecteur est le seul endroit de l'application dont le fonctionnement
+    // dépende d'un tiers (l'API IFrame de YouTube) chargé dans une vue web :
+    // sans trace de son côté, une vidéo qui ne part pas ne laisse rien à lire.
+    _logger = ref
+        .read(loggerProvider)
+        .withContext({'player.chapters': _ids.length});
+    _logger.info('player.opened');
   }
 
   /// Reçoit la vidéo courante depuis la page et met à jour le bouton actif.
@@ -60,6 +80,27 @@ class _BibleReaderState extends State<BibleReader> {
     if (index >= 0 && index != _index && mounted) {
       setState(() => _index = index);
     }
+  }
+
+  /// Reçoit un `onError` de l'API IFrame YouTube.
+  ///
+  /// Les codes sont ceux de l'API : `2` identifiant mal formé, `5` incompatible
+  /// avec le lecteur HTML5, `100` vidéo supprimée ou privée, `101`/`150`
+  /// intégration interdite par le propriétaire. Les trois derniers désignent un
+  /// problème de contenu — l'identifiant renvoyé par l'API ne mène nulle part —
+  /// et se corrigent côté base, pas côté application : d'où la journalisation
+  /// de l'identifiant fautif.
+  void _onPlayerError(List<dynamic> arguments) {
+    final payload = arguments.isEmpty ? null : arguments.first;
+    if (payload is! Map) return;
+    final code = payload['code'];
+    _logger.warn(
+      'player.failed',
+      attrs: {
+        'player.error_code': code is int ? code : int.tryParse('$code'),
+        'player.video_id': payload['videoId'] as String? ?? '',
+      },
+    );
   }
 
   @override
@@ -111,6 +152,45 @@ class _BibleReaderState extends State<BibleReader> {
                   controller.addJavaScriptHandler(
                     handlerName: 'chapter',
                     callback: _onChapterChanged,
+                  );
+                  controller.addJavaScriptHandler(
+                    handlerName: 'playerError',
+                    callback: _onPlayerError,
+                  );
+                },
+                // La page hôte est locale : une erreur ici vise l'API IFrame ou
+                // la vidéo elle-même, jamais notre HTML.
+                onReceivedError: (_, request, error) => _logger.warn(
+                  'player.load_failed',
+                  attrs: {
+                    'player.url': request.url.host,
+                    'player.error_type': error.type.toNativeValue(),
+                    'player.error': error.description,
+                  },
+                ),
+                onReceivedHttpError: (_, request, response) => _logger.warn(
+                  'player.http_failed',
+                  attrs: {
+                    'player.url': request.url.host,
+                    'http.status': response.statusCode,
+                  },
+                ),
+                // Les défaillances du script de la page hôte — API IFrame
+                // absente, réseau coupé au chargement — ne remontent que par
+                // là : rien côté Dart ne les verrait autrement.
+                onConsoleMessage: (_, message) {
+                  if (message.messageLevel != ConsoleMessageLevel.ERROR) return;
+                  if (_consoleErrors >= _maxConsoleErrors) return;
+                  _consoleErrors++;
+                  _logger.warn(
+                    'player.console_error',
+                    attrs: {
+                      // Tronqué : certaines traces de l'iframe font plusieurs
+                      // kilo-octets, et le début porte l'essentiel.
+                      'player.message': message.message.length > 300
+                          ? message.message.substring(0, 300)
+                          : message.message,
+                    },
                   );
                 },
               ),
@@ -187,7 +267,18 @@ String _buildPage(List<String> ids) {
               }
               report();
             },
-            onStateChange: report
+            onStateChange: report,
+            // Seule remontée d'un identifiant qui ne mène nulle part (vidéo
+            // supprimée, privée, ou dont l'intégration est refusée) : le
+            // lecteur affiche « vidéo indisponible » et n'en dit rien de plus.
+            onError: function (event) {
+              var videoId = '';
+              try { videoId = player.getVideoData().video_id || ''; } catch (e) {}
+              window.flutter_inappwebview.callHandler('playerError', {
+                code: event.data,
+                videoId: videoId
+              });
+            }
           }
         });
       }

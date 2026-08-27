@@ -10,27 +10,66 @@ part of 'logger.service_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Unique [LoggerService] de l'application.
 ///
-/// La console est le seul puits pour l'instant. Le port existe justement pour
-/// qu'ajouter un export distant plus tard (à la manière de kidflix et songbook)
-/// ne touche que ce fichier.
+/// Le choix de l'implémentation :
+///
+/// | Mode    | `SIGNOZ_INGEST_URL` | Implémentation                          |
+/// |---------|---------------------|-----------------------------------------|
+/// | release | absent              | console seule (repli sûr)               |
+/// | release | présent             | Signoz seul                             |
+/// | debug   | absent              | console seule                           |
+/// | debug   | présent             | composite : console + Signoz            |
+///
+/// La dernière ligne est celle qui permet de vérifier un branchement : le
+/// développeur lit dans son terminal, préfixé `[→signoz]`, exactement ce qui
+/// part sur le réseau.
+///
+/// `keepAlive` parce que l'adaptateur Signoz détient une minuterie et un client
+/// HTTP qu'il serait absurde de reconstruire à la demande — et parce qu'une
+/// reconstruction jetterait le tampon d'envoi en cours.
 
 @ProviderFor(loggerService)
 final loggerServiceProvider = LoggerServiceProvider._();
 
 /// Unique [LoggerService] de l'application.
 ///
-/// La console est le seul puits pour l'instant. Le port existe justement pour
-/// qu'ajouter un export distant plus tard (à la manière de kidflix et songbook)
-/// ne touche que ce fichier.
+/// Le choix de l'implémentation :
+///
+/// | Mode    | `SIGNOZ_INGEST_URL` | Implémentation                          |
+/// |---------|---------------------|-----------------------------------------|
+/// | release | absent              | console seule (repli sûr)               |
+/// | release | présent             | Signoz seul                             |
+/// | debug   | absent              | console seule                           |
+/// | debug   | présent             | composite : console + Signoz            |
+///
+/// La dernière ligne est celle qui permet de vérifier un branchement : le
+/// développeur lit dans son terminal, préfixé `[→signoz]`, exactement ce qui
+/// part sur le réseau.
+///
+/// `keepAlive` parce que l'adaptateur Signoz détient une minuterie et un client
+/// HTTP qu'il serait absurde de reconstruire à la demande — et parce qu'une
+/// reconstruction jetterait le tampon d'envoi en cours.
 
 final class LoggerServiceProvider
     extends $FunctionalProvider<LoggerService, LoggerService, LoggerService>
     with $Provider<LoggerService> {
   /// Unique [LoggerService] de l'application.
   ///
-  /// La console est le seul puits pour l'instant. Le port existe justement pour
-  /// qu'ajouter un export distant plus tard (à la manière de kidflix et songbook)
-  /// ne touche que ce fichier.
+  /// Le choix de l'implémentation :
+  ///
+  /// | Mode    | `SIGNOZ_INGEST_URL` | Implémentation                          |
+  /// |---------|---------------------|-----------------------------------------|
+  /// | release | absent              | console seule (repli sûr)               |
+  /// | release | présent             | Signoz seul                             |
+  /// | debug   | absent              | console seule                           |
+  /// | debug   | présent             | composite : console + Signoz            |
+  ///
+  /// La dernière ligne est celle qui permet de vérifier un branchement : le
+  /// développeur lit dans son terminal, préfixé `[→signoz]`, exactement ce qui
+  /// part sur le réseau.
+  ///
+  /// `keepAlive` parce que l'adaptateur Signoz détient une minuterie et un client
+  /// HTTP qu'il serait absurde de reconstruire à la demande — et parce qu'une
+  /// reconstruction jetterait le tampon d'envoi en cours.
   LoggerServiceProvider._()
     : super(
         from: null,
@@ -64,22 +103,25 @@ final class LoggerServiceProvider
   }
 }
 
-String _$loggerServiceHash() => r'f8676e39a0224a2b7e2b63cfc598a5440878b7c3';
+String _$loggerServiceHash() => r'ceda60f2947586d3693bc90cbd011188ff1796ae';
 
-/// Contexte de log de l'application : un identifiant de session par lancement.
-/// `keepAlive` pour qu'il reste stable d'un bout à l'autre de l'exécution.
+/// Contexte de log de l'application : un identifiant de session par lancement,
+/// et l'identifiant du compte une fois connecté. `keepAlive` pour qu'il reste
+/// stable d'un bout à l'autre de l'exécution.
 
 @ProviderFor(logContext)
 final logContextProvider = LogContextProvider._();
 
-/// Contexte de log de l'application : un identifiant de session par lancement.
-/// `keepAlive` pour qu'il reste stable d'un bout à l'autre de l'exécution.
+/// Contexte de log de l'application : un identifiant de session par lancement,
+/// et l'identifiant du compte une fois connecté. `keepAlive` pour qu'il reste
+/// stable d'un bout à l'autre de l'exécution.
 
 final class LogContextProvider
     extends $FunctionalProvider<LogContext, LogContext, LogContext>
     with $Provider<LogContext> {
-  /// Contexte de log de l'application : un identifiant de session par lancement.
-  /// `keepAlive` pour qu'il reste stable d'un bout à l'autre de l'exécution.
+  /// Contexte de log de l'application : un identifiant de session par lancement,
+  /// et l'identifiant du compte une fois connecté. `keepAlive` pour qu'il reste
+  /// stable d'un bout à l'autre de l'exécution.
   LogContextProvider._()
     : super(
         from: null,
@@ -119,7 +161,12 @@ String _$logContextHash() => r'7916b30d4efa4e429461a7c504455c3530e1b103';
 ///
 /// Le contexte dynamique lit [logContextProvider] via `ref.read` — et non
 /// `ref.watch` — à chaque émission : l'instance de logger reste stable pendant
-/// que chaque enregistrement porte le `session.id` courant.
+/// que chaque enregistrement porte le `session.id` et le `user.id` courants.
+/// La reconstruire à chaque connexion viderait le tampon d'envoi de Signoz.
+///
+/// `service.version`, `os.type` et `deployment.environment` ne sont pas ici :
+/// ils sont attachés une fois par lot, en attributs de *ressource* OTLP (cf.
+/// [loggerService]).
 
 @ProviderFor(logger)
 final loggerProvider = LoggerProvider._();
@@ -128,7 +175,12 @@ final loggerProvider = LoggerProvider._();
 ///
 /// Le contexte dynamique lit [logContextProvider] via `ref.read` — et non
 /// `ref.watch` — à chaque émission : l'instance de logger reste stable pendant
-/// que chaque enregistrement porte le `session.id` courant.
+/// que chaque enregistrement porte le `session.id` et le `user.id` courants.
+/// La reconstruire à chaque connexion viderait le tampon d'envoi de Signoz.
+///
+/// `service.version`, `os.type` et `deployment.environment` ne sont pas ici :
+/// ils sont attachés une fois par lot, en attributs de *ressource* OTLP (cf.
+/// [loggerService]).
 
 final class LoggerProvider
     extends
@@ -142,7 +194,12 @@ final class LoggerProvider
   ///
   /// Le contexte dynamique lit [logContextProvider] via `ref.read` — et non
   /// `ref.watch` — à chaque émission : l'instance de logger reste stable pendant
-  /// que chaque enregistrement porte le `session.id` courant.
+  /// que chaque enregistrement porte le `session.id` et le `user.id` courants.
+  /// La reconstruire à chaque connexion viderait le tampon d'envoi de Signoz.
+  ///
+  /// `service.version`, `os.type` et `deployment.environment` ne sont pas ici :
+  /// ils sont attachés une fois par lot, en attributs de *ressource* OTLP (cf.
+  /// [loggerService]).
   LoggerProvider._()
     : super(
         from: null,

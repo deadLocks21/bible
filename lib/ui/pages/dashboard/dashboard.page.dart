@@ -1,5 +1,6 @@
 import 'package:bible/core/application/dtos/reading_board.dto.dart';
 import 'package:bible/core/domain/exceptions/reading.exception.dart';
+import 'package:bible/ui/observability/logging.navigator_observer.dart';
 import 'package:bible/ui/pages/dashboard/providers/reading_board.provider.dart';
 import 'package:bible/ui/pages/dashboard/providers/reading_stats.provider.dart';
 import 'package:bible/ui/pages/dashboard/providers/stats_expanded.provider.dart';
@@ -93,7 +94,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             icon: const Icon(Icons.history),
             tooltip: 'Historique',
             onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const HistoryPage()),
+              MaterialPageRoute<void>(
+                settings: AppRoutes.of(AppRoutes.history),
+                builder: (_) => const HistoryPage(),
+              ),
             ),
           ),
           IconButton(
@@ -101,7 +105,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Réglages',
             onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const SettingsPage()),
+              MaterialPageRoute<void>(
+                settings: AppRoutes.of(AppRoutes.settings),
+                builder: (_) => const SettingsPage(),
+              ),
             ),
           ),
         ],
